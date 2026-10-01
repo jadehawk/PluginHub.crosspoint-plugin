@@ -6,6 +6,7 @@
 - Import the existing CrossPoint Plugin Store entries except the legacy `send2ereader` entry.
 - Resolve mutable GitHub Raw branch URLs from curated catalogs to immutable commit-SHA URLs.
 - Prefer release-discovered plugins over curated catalog entries when the same plugin ID appears in both.
+- Document the complete self-service listing requirements, troubleshooting checks, and version-tracking rules for release-discovered and curated plugins.
 
 ## 0.1.0
 

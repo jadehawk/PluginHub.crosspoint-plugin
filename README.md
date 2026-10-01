@@ -10,9 +10,10 @@ Actions does the heavier discovery work off-device.
 ## How it works
 
 1. Plugin authors publish a normal CrossPoint plugin repository.
-2. Plugin Hub discovers candidate repositories on GitHub.
-3. The catalog builder validates the latest stable GitHub Release.
-4. `catalog.json` is generated with immutable release-tag URLs.
+2. Plugin Hub discovers candidate repositories on GitHub and also reads explicitly
+   curated sources from `whitelist.json`.
+3. The catalog builder validates versions and install files.
+4. `catalog.json` is generated with immutable release-tag or commit-SHA URLs.
 5. Plugin Hub's `device.json` presents that catalog using CrossPoint's built-in
    plugin catalog UI.
 6. CrossPoint installs each selected bundle under
@@ -21,60 +22,36 @@ Actions does the heavier discovery work off-device.
 Plugin Hub itself contains no on-device JavaScript. Installation and updating are
 handled by CrossPoint's existing declarative `device.json` bundle installer.
 
-## Discovery
+## Get your plugin listed
 
-The catalog builder searches GitHub for:
+For a new standalone CrossPoint plugin, **automatic discovery is the recommended
+path and does not require a Plugin Hub pull request**.
 
-- repositories with the `crosspoint-plugin` topic;
-- repositories whose name contains the distinctive `crosspoint-plugin` phrase.
+To make your plugin eligible for Plugin Hub:
 
-The `crosspoint-plugin` topic is the registration mechanism for normal
-`.xp-plugin` repositories. Names such as `example.crosspoint-plugin` and
-`example-crosspoint-plugin` are retained as compatibility fallbacks. Plugin Hub
-deliberately does not search globally for `.xp-plugin` because that term also
-matches large numbers of unrelated X-Plane, Xposed, and other repositories.
+1. Host the plugin in a **public GitHub repository**.
+2. Add the GitHub repository topic **`crosspoint-plugin`**.
+3. Keep a root-level `manifest.json` in the repository.
+4. Make sure the release contains `manifest.json` plus at least one runnable
+   CrossPoint entry point: `device.json` or `plugin.js`.
+5. Put every file that must be installed in the optional `files` array in
+   `manifest.json`. If `files` is omitted, Plugin Hub only considers the
+   conventional root files `manifest.json`, `device.json`, `plugin.js`, and
+   `README.md`.
+6. Set a numeric version in `manifest.json`, for example `1.2.0` or
+   `0.1.2.1`.
+7. Publish a **non-draft, non-prerelease GitHub Release** with a matching version
+   tag, for example `v1.2.0` for manifest version `1.2.0`.
+8. Wait for the next Plugin Hub catalog refresh. The Action runs every three
+   hours, and maintainers can also run it manually.
 
-Plugin Hub excludes its own repository from the generated catalog.
+Repository names containing `crosspoint-plugin`, such as
+`example.crosspoint-plugin` or `example-crosspoint-plugin`, are also searched
+as a compatibility fallback. The **`crosspoint-plugin` topic is still the
+recommended registration mechanism**. Plugin Hub deliberately does not globally
+search for `.xp-plugin` because that name also matches unrelated ecosystems.
 
-### Curated whitelist
-
-`whitelist.json` supplements automatic discovery for plugins that do not yet use
-the standalone release-driven convention.
-
-It supports two curated sources:
-
-- `repositories`: explicit GitHub repositories that should be processed through
-  the same latest-stable-release validation as automatically discovered plugins.
-- `catalogs`: existing plugin catalogs plus an explicit list of plugin IDs to
-  import from each catalog.
-
-Catalog imports are allowlisted by plugin ID; Plugin Hub never imports every entry
-from a remote catalog implicitly. The current whitelist imports the existing
-CrossPoint Plugin Store entries except its legacy `send2ereader` entry. The
-release-discovered `send2ereader.crosspoint-plugin` repository remains
-authoritative for that plugin ID.
-
-When an imported catalog entry points at a mutable GitHub Raw branch such as
-`main`, the builder resolves that branch to its current commit SHA and publishes
-the immutable SHA-based URL in Plugin Hub's generated catalog. The imported
-version still comes from the upstream catalog, so a future upstream version bump
-is detected automatically on the next refresh.
-
-## Plugin requirements
-
-A discovered repository must have a stable GitHub Release whose tag is a numeric
-version in one of these forms:
-
-- `v1.2`
-- `v1.2.3`
-- `v1.2.3.4`
-
-The leading `v` is optional.
-
-At that release tag, the repository must contain a root `manifest.json`. Its
-`version` must match the release tag after removing the optional leading `v`.
-
-A typical manifest is:
+### Minimal manifest example
 
 ```json
 {
@@ -92,35 +69,129 @@ A typical manifest is:
 }
 ```
 
-`name` should use lowercase letters, digits, and hyphens. If it is omitted,
-Plugin Hub derives the plugin ID from the repository name by stripping
-`.xp-plugin` or `.crosspoint-plugin`.
-
-### Runtime files
-
-The optional `files` array is the authoritative install list for Plugin Hub.
-Use it when the plugin needs nested assets or any runtime files beyond the normal
-CrossPoint files.
-
-When `files` is omitted, Plugin Hub automatically includes whichever of these
-root files exist:
-
-```text
-manifest.json
-device.json
-plugin.js
-README.md
-```
-
-A valid plugin must include `manifest.json` plus at least one of
-`device.json` or `plugin.js`.
+The recommended `name` format is lowercase letters, digits, and hyphens. If
+`name` is missing or unusable, Plugin Hub attempts to derive the plugin ID from
+the repository name by stripping `.xp-plugin`, `.crosspoint-plugin`, or
+`-crosspoint-plugin`.
 
 Development files such as tests, GitHub workflows, package metadata, and build
 scripts are not installed unless a plugin explicitly lists them in `files`.
 
+### If your plugin does not appear
+
+Check these items first:
+
+1. The repository is public.
+2. The repository has the `crosspoint-plugin` topic, or its name contains the
+   `crosspoint-plugin` phrase.
+3. A stable GitHub Release exists. A tag by itself is not enough.
+4. The Release is not marked draft or prerelease.
+5. The Release tag is a supported numeric version.
+6. The root `manifest.json` exists at that exact Release tag.
+7. The manifest version matches the Release tag exactly after removing an optional
+   leading `v`.
+8. The install file list is safe and contains `manifest.json` plus
+   `device.json` or `plugin.js`.
+
+If any of those checks fail, the repository is skipped rather than publishing a
+partially valid catalog entry.
+
+## Version tracking
+
+Version tracking is intentionally strict. Plugin Hub does **not** infer a newer
+version from commit dates, changelog text, filenames, branch activity, or changed
+file contents.
+
+### Release-discovered plugins
+
+For automatically discovered repositories and repositories explicitly listed
+under `whitelist.json -> repositories`:
+
+- The **latest stable GitHub Release** is the remote version source of truth.
+- Supported versions contain two to four numeric components, such as `1.2`,
+  `1.2.3`, or `1.2.3.4`.
+- The GitHub Release tag may optionally begin with `v`.
+- The root `manifest.json` version at that tag must match the Release version.
+- Plugin Hub publishes the normalized numeric version without the leading `v`.
+- The generated catalog points to the exact Release tag, never to mutable
+  `main`.
+
+**Every runtime change that should reach installed users must get a new version
+and a new stable GitHub Release.** Do not change plugin files on `main` and
+expect Plugin Hub to offer an update. Do not reuse or move an existing release
+tag to different code.
+
+If your plugin also exposes a version in `device.json` or another metadata file,
+keep it synchronized with `manifest.json`. The installed plugin version used by
+CrossPoint is expected to remain consistent with the published catalog version.
+
+### Curated catalog imports
+
+`whitelist.json` also supports importing selected plugin IDs from an existing
+catalog. This exists primarily for current/legacy CrossPoint plugins that are not
+yet packaged as standalone release-driven repositories.
+
+For these entries:
+
+- `whitelist.json` contains the **catalog URL and allowed plugin IDs**, not a
+  hardcoded version.
+- On every refresh, Plugin Hub reads the current upstream catalog.
+- The upstream catalog's **`version` field is the version source of truth**.
+- Plugin Hub copies that version into its generated `catalog.json`.
+- If the upstream `base` points to a GitHub Raw branch such as `main`, Plugin
+  Hub resolves that branch to its current 40-character commit SHA so the files in
+  the generated catalog are an immutable snapshot.
+- Release-discovered plugins take precedence if the same plugin ID also appears in
+  a curated catalog import.
+
+**Changing files in an upstream branch without bumping the upstream catalog
+version will not produce a usable version update for installed users.** The
+snapshot SHA may change, but the version remains the same. Maintainers of curated
+catalog entries must bump their catalog `version` whenever runtime plugin files
+change.
+
+The current whitelist imports selected entries from the existing CrossPoint
+Plugin Store but intentionally excludes its legacy `send2ereader` entry.
+`jadehawk/send2ereader.crosspoint-plugin` is release-discovered and is the
+authoritative source for the `send2ereader` plugin ID.
+
+## Curated whitelist
+
+Automatic discovery should be used for new plugins whenever possible. A curated
+entry is appropriate when a plugin cannot yet follow the standalone release
+layout.
+
+`whitelist.json` supports:
+
+```json
+{
+  "repositories": [
+    "owner/repository"
+  ],
+  "catalogs": [
+    {
+      "url": "https://example.com/catalog.json",
+      "plugins": [
+        "plugin-id"
+      ]
+    }
+  ]
+}
+```
+
+A repository listed in `repositories` still has to pass the same stable Release
+and version checks as automatic discovery.
+
+A catalog listed in `catalogs` contributes **only** the plugin IDs explicitly
+listed under `plugins`; Plugin Hub never imports every entry from a remote
+catalog implicitly.
+
+Adding or removing curated entries requires a change to this repository's
+`whitelist.json`.
+
 ## Immutable sources
 
-Release-discovered catalog entries point to the exact GitHub release tag:
+Release-discovered catalog entries point to the exact GitHub Release tag:
 
 ```text
 https://raw.githubusercontent.com/OWNER/REPOSITORY/v0.1.0/
@@ -128,21 +199,25 @@ https://raw.githubusercontent.com/OWNER/REPOSITORY/v0.1.0/
 
 Curated entries imported from an existing catalog may begin with a mutable branch
 URL, but GitHub Raw branch URLs are resolved to the branch's current 40-character
-commit SHA before Plugin Hub publishes them. This keeps the generated catalog
-version and the files installed by CrossPoint tied to one immutable snapshot.
+commit SHA before Plugin Hub publishes them. This keeps each generated catalog
+entry tied to one immutable source snapshot.
 
 ## Catalog refresh
 
 The `Refresh Plugin Catalog` workflow runs every three hours and can also be run
 manually. It:
 
-1. runs the catalog builder test suite;
-2. searches GitHub using the discovery rules above;
-3. loads `whitelist.json` and imports only explicitly curated repositories and catalog plugin IDs;
-4. validates release-driven entries and pins mutable GitHub Raw bases from curated catalogs to commit SHAs;
-5. merges the sources, with release-discovered plugin IDs taking precedence over curated duplicates;
-6. rebuilds `catalog.json`;
-7. commits the catalog only when its plugin contents changed.
+1. syncs to the current `main` branch;
+2. runs the catalog builder test suite;
+3. searches GitHub using the automatic discovery rules;
+4. loads `whitelist.json` and imports only explicitly curated repositories and
+   catalog plugin IDs;
+5. validates release-driven entries and pins mutable GitHub Raw bases from curated
+   catalogs to commit SHAs;
+6. merges the sources, with release-discovered plugin IDs taking precedence over
+   curated duplicates;
+7. rebuilds `catalog.json`;
+8. commits the catalog only when its plugin contents changed.
 
 The generated timestamp is preserved when the catalog contents are unchanged, so
 scheduled runs do not create timestamp-only commits.
@@ -200,8 +275,8 @@ publishers.
 
 ## Current firmware note
 
-Plugin Hub does not require a CrossPoint firmware change to function. Current
-firmware may label any installed/catalog version mismatch as an update, including
-the uncommon case where a manually installed plugin is newer than the generated
-catalog. Correct directional version comparison can be addressed separately in
-CrossPoint without blocking Plugin Hub development or use.
+Plugin Hub does not require a CrossPoint firmware change to function. Firmware
+with the current SD-plugin catalog implementation may label any installed/catalog
+version mismatch as an update, including when the installed version is newer than
+the catalog version. Directional version comparison is being handled separately
+in CrossPoint firmware.
