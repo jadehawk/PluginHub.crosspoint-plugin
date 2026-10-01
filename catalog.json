@@ -1,6 +1,7 @@
 {
+  "name": "Plugin Hub",
   "schema_version": 1,
-  "generated_at": "2026-10-01T19:56:41Z",
+  "generated_at": "2026-10-01T20:07:50Z",
   "plugins": [
     {
       "name": "bookfusion",
@@ -9,7 +10,7 @@
       "author": "Diirge",
       "version": "1.2.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/bookfusion/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/bookfusion/",
       "files": [
         "manifest.json",
         "device.json",
@@ -24,7 +25,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/dictionaries/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/dictionaries/",
       "files": [
         "manifest.json",
         "device.json",
@@ -39,7 +40,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/hello/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/hello/",
       "files": [
         "manifest.json",
         "plugin.js"
@@ -66,7 +67,7 @@
       "author": "Diirge",
       "version": "1.1.2",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/plugin-store/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/plugin-store/",
       "files": [
         "manifest.json",
         "device.json",
@@ -112,7 +113,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/organize-by-author/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/organize-by-author/",
       "files": [
         "manifest.json",
         "plugin.js",
@@ -126,7 +127,7 @@
       "author": "Diirge",
       "version": "1.2.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/wallabag/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/wallabag/",
       "files": [
         "manifest.json",
         "device.json",
@@ -141,7 +142,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/webdav/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/webdav/",
       "files": [
         "manifest.json",
         "device.json",

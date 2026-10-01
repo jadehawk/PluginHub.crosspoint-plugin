@@ -10,6 +10,8 @@ on:
     paths:
       - "tools/build_catalog.py"
       - "tests/**"
+      - "plugin.js"
+      - "manifest.json"
       - "whitelist.json"
       - ".github/workflows/refresh-catalog.yml"
 
@@ -40,6 +42,9 @@ jobs:
 
       - name: Run catalog tests
         run: python -m unittest discover -s tests -v
+
+      - name: Run browser plugin tests
+        run: node --test tests/test_plugin_js.mjs
 
       - name: Build catalog
         env:

@@ -224,10 +224,12 @@ scheduled runs do not create timestamp-only commits.
 
 ## Local validation
 
-No third-party Python packages are required.
+No third-party Python packages are required. Node.js is used for the browser-side
+Plugin Hub test.
 
 ```powershell
 python -m unittest discover -s tests -v
+node --test tests/test_plugin_js.mjs
 python tools/build_catalog.py
 ```
 
@@ -242,6 +244,7 @@ Plugin Hub is a normal CrossPoint plugin. Its runtime files are:
 ```text
 manifest.json
 device.json
+plugin.js
 README.md
 ```
 
@@ -253,18 +256,82 @@ Store URL:
 https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/bootstrap-catalog.json
 ```
 
-That bootstrap catalog contains only Plugin Hub and installs the immutable
-`v0.1.0` release. After Plugin Hub is installed, the temporary bootstrap Store
-can be removed.
+The bootstrap catalog installs the immutable Plugin Hub release. After Plugin Hub
+is installed, the temporary bootstrap Store can be removed.
 
-Once Plugin Hub itself is installed, open it from:
+### On the reader
+
+Open:
 
 ```text
 Settings → System → Plugins → Plugin Hub
 ```
 
-The catalog is then fetched directly from this repository and displayed by the
-firmware's standard plugin catalog screen.
+The reader uses `device.json` and browses the main generated Plugin Hub catalog
+directly.
+
+### From the device web UI
+
+Plugin Hub also mounts a browser-side management card under **Settings** through
+`plugin.js`. It provides the same plugin-management flow as the original
+CrossPoint Plugin Store:
+
+- install an available plugin;
+- update when the catalog version is newer than the installed version;
+- reinstall the same version;
+- remove an installed plugin;
+- show installed/catalog versions and update counts.
+
+The built-in Plugin Hub catalog is always present and cannot be removed from this
+browser card.
+
+#### Add custom, test, or private catalogs
+
+Under **Catalogs**, add any additional catalog URL and choose **Save & refresh**.
+The URL is stored on the SD card in:
+
+```text
+/.crosspoint/plugin-hub.json
+```
+
+Additional catalogs are loaded alongside the built-in Plugin Hub catalog and each
+catalog is shown under its own heading. A custom catalog can be hosted on GitHub
+Raw, a LAN server, a private/test web server, or another HTTP(S) endpoint that the
+device can fetch.
+
+A minimal custom catalog is:
+
+```json
+{
+  "name": "My Private Plugins",
+  "plugins": [
+    {
+      "name": "my-test-plugin",
+      "title": "My Test Plugin",
+      "description": "Private test build.",
+      "author": "Me",
+      "version": "0.0.1",
+      "base": "https://example.test/my-test-plugin/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    }
+  ]
+}
+```
+
+The optional top-level `name` is used as the catalog heading. If it is omitted,
+Plugin Hub displays the catalog host name instead.
+
+The browser UI does not currently manage arbitrary authentication headers or
+credentials for private catalogs. If authentication is required, use a URL the
+device can fetch directly, such as a signed URL or a reachable authenticated
+endpoint that does not require interactive browser login.
+
+Custom catalogs are currently a **browser-side Plugin Hub feature**. The on-reader
+Plugin Hub screen continues to use the main generated Plugin Hub catalog from
+`device.json`.
 
 ## Trust model
 

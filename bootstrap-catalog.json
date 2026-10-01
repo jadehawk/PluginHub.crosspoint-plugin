@@ -1,15 +1,17 @@
 {
+  "name": "Plugin Hub Bootstrap",
   "plugins": [
     {
       "name": "pluginhub",
       "title": "Plugin Hub",
       "description": "Discover, install, and update CrossPoint community plugins.",
       "author": "Jadehawk",
-      "version": "0.1.0",
-      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/v0.1.0/",
+      "version": "0.1.1",
+      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/v0.1.1/",
       "files": [
         "manifest.json",
         "device.json",
+        "plugin.js",
         "README.md"
       ]
     }

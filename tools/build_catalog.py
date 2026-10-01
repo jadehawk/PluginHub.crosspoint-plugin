@@ -465,6 +465,7 @@ def write_catalog(path: Path, plugins: list[dict[str, Any]]) -> bool:
         generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     payload = {
+        "name": "Plugin Hub",
         "schema_version": 1,
         "generated_at": generated_at,
         "plugins": plugins,

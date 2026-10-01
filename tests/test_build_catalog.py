@@ -287,6 +287,7 @@ class CatalogBuilderTests(unittest.TestCase):
             path.write_text(
                 json.dumps(
                     {
+                        "name": "Plugin Hub",
                         "schema_version": 1,
                         "generated_at": "2026-10-01T00:00:00Z",
                         "plugins": plugins,
