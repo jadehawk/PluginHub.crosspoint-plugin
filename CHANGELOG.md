@@ -7,6 +7,7 @@
 - Resolve mutable GitHub Raw branch URLs from curated catalogs to immutable commit-SHA URLs.
 - Prefer release-discovered plugins over curated catalog entries when the same plugin ID appears in both.
 - Add the browser-side `plugin.js` management UI with install, update, reinstall, and remove controls.
+- Show Plugin Hub's installed version in the WebUI and check the latest stable GitHub Release for an available self-update.
 - Keep the generated Plugin Hub catalog as the built-in browser source while allowing users to add and remove extra custom, test, or private catalog URLs.
 - Use directional two-to-four-part numeric version comparison in the browser UI so older catalog versions are not offered as downgrades.
 - Add a browser integration test covering custom catalogs and directional update handling.

@@ -31,7 +31,7 @@ class Element {
 }
 
 function fakeDocument() {
-  const ids = ['ph-catalogs', 'ph-new', 'ph-add', 'ph-refresh', 'ph-status', 'ph-list'];
+  const ids = ['ph-version', 'ph-catalogs', 'ph-new', 'ph-add', 'ph-refresh', 'ph-status', 'ph-list'];
   const elements = Object.fromEntries(ids.map((id) => [id, new Element('div', id)]));
   return {
     elements,
@@ -137,6 +137,9 @@ test('browser hub loads custom catalogs and only offers directional updates', as
           text: JSON.stringify({ extraCatalogs: [PRIVATE_CATALOG] }),
         });
       }
+      if (path === '/.crosspoint/plugins/pluginhub/manifest.json') {
+        return response({ text: JSON.stringify({ version: '0.1.1' }) });
+      }
       if (path === '/.crosspoint/plugins/monthwallpaper/manifest.json') {
         return response({ text: JSON.stringify({ version: '1.1.0' }) });
       }
@@ -169,6 +172,9 @@ test('browser hub loads custom catalogs and only offers directional updates', as
     async relay(method, url) {
       assert.equal(method, 'GET');
       relayCalls.push(url);
+      if (url.includes('/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest')) {
+        return { status: 200, body: JSON.stringify({ tag_name: 'v0.1.1' }) };
+      }
       if (url === DEFAULT_CATALOG) {
         return { status: 200, body: JSON.stringify(defaultCatalog) };
       }
@@ -185,7 +191,10 @@ test('browser hub loads custom catalogs and only offers directional updates', as
   const render = await loadPlugin({ document, fetch });
   await render({ innerHTML: '' }, api);
 
-  assert.deepEqual(relayCalls, [DEFAULT_CATALOG, PRIVATE_CATALOG]);
+  assert.equal(relayCalls.length, 3);
+  assert.match(relayCalls[0], /PluginHub\.crosspoint-plugin\/releases\/latest$/);
+  assert.deepEqual(relayCalls.slice(1), [DEFAULT_CATALOG, PRIVATE_CATALOG]);
+  assert.equal(document.elements['ph-version'].textContent, 'Version: v0.1.1');
   assert.equal(writes.length, 1);
   assert.equal(writes[0].path, '/.crosspoint/plugin-hub.json');
   assert.deepEqual(JSON.parse(writes[0].data), {

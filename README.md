@@ -273,8 +273,10 @@ directly.
 ### From the device web UI
 
 Plugin Hub also mounts a browser-side management card under **Settings** through
-`plugin.js`. It provides the same plugin-management flow as the original
-CrossPoint Plugin Store:
+`plugin.js`. The card shows the installed Plugin Hub version from its own
+`manifest.json` and checks the latest stable GitHub Release, matching the
+Send2Ereader WebUI behavior. It provides the same plugin-management flow as the
+original CrossPoint Plugin Store:
 
 - install an available plugin;
 - update when the catalog version is newer than the installed version;

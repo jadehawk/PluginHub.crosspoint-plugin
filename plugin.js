@@ -3,6 +3,7 @@
 CrossPoint.registerPlugin(async (container, api) => {
   const CONFIG_PATH = '/.crosspoint/plugin-hub.json';
   const PLUGINS_DIR = '/.crosspoint/plugins';
+  const RELEASE_API_URL = 'https://api.github.com/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest';
   const DEFAULT_CATALOG =
     'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog.json';
 
@@ -10,6 +11,7 @@ CrossPoint.registerPlugin(async (container, api) => {
 
   container.innerHTML =
     '<h2>Plugin Hub</h2>' +
+    '<p id="ph-version" style="color:#666">Version: checking...</p>' +
     '<h3 style="margin:0.5em 0 0.2em">Catalogs</h3>' +
     '<div id="ph-catalogs"></div>' +
     '<div class="setting-row">' +
@@ -140,6 +142,42 @@ CrossPoint.registerPlugin(async (container, api) => {
       return 'Installed v' + localVersion + ' (catalog v' + remoteVersion + ')';
     }
     return 'Installed v' + localVersion;
+  }
+
+  async function checkHubVersion() {
+    const versionEl = document.getElementById('ph-version');
+    const installed = String((await installedVersion('pluginhub')) || '').trim();
+    if (!numericVersion(installed)) {
+      versionEl.textContent = 'Version: unavailable';
+      return;
+    }
+
+    versionEl.textContent = 'Version: v' + installed;
+    versionEl.style.color = '#666';
+
+    try {
+      const response = await api.relay(
+        'GET',
+        RELEASE_API_URL,
+        {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': 'PluginHub-CrossPoint'
+        },
+        ''
+      );
+      if (response.error || (response.status && (response.status < 200 || response.status >= 300))) {
+        return;
+      }
+
+      const release = response.body ? JSON.parse(response.body) : {};
+      const latest = String(release.tag_name || '').trim().replace(/^v/i, '');
+      const comparison = compareVersions(latest, installed);
+      if (comparison > 0) {
+        versionEl.textContent =
+          'Version: v' + installed + ' — Update available: v' + latest;
+        versionEl.style.color = '#c0392b';
+      }
+    } catch (e) {}
   }
 
   async function relayText(url) {
@@ -497,5 +535,6 @@ CrossPoint.registerPlugin(async (container, api) => {
   }
 
   renderCatalogs();
+  await checkHubVersion();
   await refresh();
 });
