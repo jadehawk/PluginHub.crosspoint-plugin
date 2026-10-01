@@ -1,7 +1,92 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-10-01T18:26:32Z",
+  "generated_at": "2026-10-01T19:05:02Z",
   "plugins": [
+    {
+      "name": "bookfusion",
+      "title": "BookFusion",
+      "description": "Browse and download your BookFusion library on the device.",
+      "author": "Diirge",
+      "version": "1.2.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/bookfusion/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "dictionaries",
+      "title": "Dictionaries",
+      "description": "Download offline dictionaries for the built-in dictionary lookup, and pick the active one.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/dictionaries/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "hello",
+      "title": "Hello Plugin",
+      "description": "Minimal example plugin.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/hello/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
+    {
+      "name": "monthwallpaper",
+      "title": "Month Wallpaper",
+      "description": "Download a month-calendar sleep wallpaper from Month Wallpaper server.",
+      "author": "marczykm",
+      "version": "1.0.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/marczykm/month-wallpaper-crosspoint-plugin/c9df145639e5056bb465292d1078ba6f85c2677d/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "README.md"
+      ]
+    },
+    {
+      "name": "plugin-store",
+      "title": "Plugin Store",
+      "description": "Browse and install plugins from a hosted catalog.",
+      "author": "Diirge",
+      "version": "1.1.2",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/plugin-store/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "protected-content",
+      "title": "Protected Content",
+      "description": "Fulfill protected content from an online provider.",
+      "author": "Diirge",
+      "version": "1.0.4",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://protected-content-host-production.up.railway.app/",
+      "files": [
+        "manifest.json",
+        "plugin.js"
+      ]
+    },
     {
       "name": "send2ereader",
       "title": "Send2Ereader",
@@ -13,6 +98,50 @@
       "release_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.2.1",
       "published_at": "2026-10-01T18:25:24Z",
       "base": "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.2.1/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "organize-by-author",
+      "title": "Sort EPUBs by Author",
+      "description": "Sort EPUBs in a folder into per-author subfolders.",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/organize-by-author/",
+      "files": [
+        "manifest.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "wallabag",
+      "title": "Wallabag",
+      "description": "Read your Wallabag saved articles on the device as EPUB.",
+      "author": "Diirge",
+      "version": "1.2.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/wallabag/",
+      "files": [
+        "manifest.json",
+        "device.json",
+        "plugin.js",
+        "README.md"
+      ]
+    },
+    {
+      "name": "webdav",
+      "title": "WebDAV",
+      "description": "Browse and download books from a WebDAV server (Nextcloud, Koofr, ...).",
+      "author": "Diirge",
+      "version": "1.0.0",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/47f525e3ed34dbbbd97354c73db9c07c7141bd3e/webdav/",
       "files": [
         "manifest.json",
         "device.json",
