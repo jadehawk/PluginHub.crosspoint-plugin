@@ -284,12 +284,25 @@ CrossPoint.registerPlugin(async (container, api) => {
 
     const primary = document.createElement('div');
     primary.className = 'setting-row';
-    primary.innerHTML =
-      '<span class="setting-name"><strong>Plugin Hub</strong><br>' +
-      '<span style="color:#666">Built-in community catalog</span></span>' +
-      '<span class="setting-control"><input type="text" value="' +
-      escapeHtml(DEFAULT_CATALOG) +
-      '" style="width:100%" readonly></span>';
+
+    const primaryInput = document.createElement('input');
+    primaryInput.type = 'text';
+    primaryInput.value = DEFAULT_CATALOG;
+    primaryInput.style.width = '100%';
+    primaryInput.readOnly = true;
+
+    const primaryControl = document.createElement('span');
+    primaryControl.className = 'setting-control';
+    primaryControl.appendChild(primaryInput);
+
+    const builtIn = document.createElement('button');
+    builtIn.type = 'button';
+    builtIn.className = 'btn-small';
+    builtIn.textContent = 'Built-in';
+    builtIn.disabled = true;
+
+    primary.appendChild(primaryControl);
+    primary.appendChild(builtIn);
     catalogsEl.appendChild(primary);
 
     extraCatalogs.forEach((url, index) => {

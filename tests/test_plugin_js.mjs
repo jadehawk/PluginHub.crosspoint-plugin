@@ -195,6 +195,14 @@ test('browser hub loads custom catalogs and only offers directional updates', as
   assert.match(relayCalls[0], /PluginHub\.crosspoint-plugin\/releases\/latest$/);
   assert.deepEqual(relayCalls.slice(1), [DEFAULT_CATALOG, PRIVATE_CATALOG]);
   assert.equal(document.elements['ph-version'].textContent, 'Version: v0.1.1');
+
+  const catalogRows = document.elements['ph-catalogs'].children;
+  assert.equal(catalogRows.length, 2);
+  assert.equal(catalogRows[0].children[0].className, 'setting-control');
+  assert.equal(catalogRows[0].children[0].children[0].value, DEFAULT_CATALOG);
+  assert.equal(catalogRows[0].children[1].textContent, 'Built-in');
+  assert.equal(catalogRows[0].children[1].disabled, true);
+
   assert.equal(writes.length, 1);
   assert.equal(writes[0].path, '/.crosspoint/plugin-hub.json');
   assert.deepEqual(JSON.parse(writes[0].data), {
