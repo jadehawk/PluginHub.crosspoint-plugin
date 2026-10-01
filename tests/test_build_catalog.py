@@ -154,6 +154,115 @@ class CatalogBuilderTests(unittest.TestCase):
         self.assertIn('in:name "crosspoint-plugin"', build_catalog.SEARCH_QUERIES)
         self.assertNotIn('in:name ".xp-plugin"', build_catalog.SEARCH_QUERIES)
 
+    def test_pin_raw_github_base_uses_commit_sha_for_branch(self):
+        class PinClient:
+            def __init__(self):
+                self.calls = []
+
+            def commit_sha(self, full_name, ref):
+                self.calls.append((full_name, ref))
+                return "a" * 40
+
+        client = PinClient()
+
+        self.assertEqual(
+            build_catalog.pin_raw_github_base(
+                client,
+                "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/bookfusion/",
+            ),
+            f"https://raw.githubusercontent.com/itsthisjustin/sd-plugins/{'a' * 40}/bookfusion/",
+        )
+        self.assertEqual(
+            build_catalog.pin_raw_github_base(
+                client,
+                "https://raw.githubusercontent.com/marczykm/month-wallpaper-crosspoint-plugin/refs/heads/main/",
+            ),
+            f"https://raw.githubusercontent.com/marczykm/month-wallpaper-crosspoint-plugin/{'a' * 40}/",
+        )
+        self.assertEqual(
+            client.calls,
+            [
+                ("itsthisjustin/sd-plugins", "main"),
+                ("marczykm/month-wallpaper-crosspoint-plugin", "main"),
+            ],
+        )
+
+    def test_curated_catalog_imports_only_whitelisted_plugins(self):
+        class CuratedClient:
+            def fetch_json_url(self, url):
+                return {
+                    "plugins": [
+                        {
+                            "name": "bookfusion",
+                            "title": "BookFusion",
+                            "description": "Browse books.",
+                            "author": "Diirge",
+                            "version": "1.2.0",
+                            "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/bookfusion/",
+                            "files": [
+                                "manifest.json",
+                                "device.json",
+                                "plugin.js",
+                                "README.md",
+                            ],
+                        },
+                        {
+                            "name": "send2ereader",
+                            "title": "Old Send2Ereader",
+                            "description": "Legacy entry.",
+                            "author": "Jadehawk",
+                            "version": "0.1.0",
+                            "base": "https://example.invalid/",
+                            "files": ["manifest.json", "device.json"],
+                        },
+                    ]
+                }
+
+            def commit_sha(self, full_name, ref):
+                return "b" * 40
+
+        whitelist = {
+            "repositories": [],
+            "catalogs": [
+                {
+                    "url": "https://example.test/catalog.json",
+                    "plugins": ["bookfusion"],
+                }
+            ],
+        }
+
+        plugins = build_catalog.curated_catalog_plugins(CuratedClient(), whitelist)
+
+        self.assertEqual(len(plugins), 1)
+        self.assertEqual(plugins[0]["name"], "bookfusion")
+        self.assertEqual(plugins[0]["version"], "1.2.0")
+        self.assertEqual(
+            plugins[0]["base"],
+            f"https://raw.githubusercontent.com/itsthisjustin/sd-plugins/{'b' * 40}/bookfusion/",
+        )
+        self.assertEqual(plugins[0]["source_catalog"], "https://example.test/catalog.json")
+
+    def test_release_plugin_wins_over_curated_duplicate(self):
+        curated = [
+            {
+                "name": "send2ereader",
+                "title": "Send2Ereader",
+                "version": "0.1.0",
+            }
+        ]
+        release = [
+            {
+                "name": "send2ereader",
+                "title": "Send2Ereader",
+                "version": "0.1.2.2",
+            }
+        ]
+
+        merged = build_catalog.merge_plugins(release, curated)
+
+        self.assertEqual(len(merged), 1)
+        self.assertEqual(merged[0]["version"], "0.1.2.2")
+
     def test_rate_limit_aborts_catalog_build_instead_of_publishing_partial_results(self):
         class RateLimitedClient:
             def search_repositories(self, query):

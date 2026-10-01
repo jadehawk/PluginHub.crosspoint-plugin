@@ -1,0 +1,19 @@
+{
+  "repositories": [],
+  "catalogs": [
+    {
+      "url": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
+      "plugins": [
+        "bookfusion",
+        "dictionaries",
+        "hello",
+        "monthwallpaper",
+        "organize-by-author",
+        "plugin-store",
+        "protected-content",
+        "wallabag",
+        "webdav"
+      ]
+    }
+  ]
+}

@@ -10,6 +10,7 @@ on:
     paths:
       - "tools/build_catalog.py"
       - "tests/**"
+      - "whitelist.json"
       - ".github/workflows/refresh-catalog.yml"
 
 permissions:

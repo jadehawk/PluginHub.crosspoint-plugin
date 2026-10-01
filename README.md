@@ -36,6 +36,30 @@ matches large numbers of unrelated X-Plane, Xposed, and other repositories.
 
 Plugin Hub excludes its own repository from the generated catalog.
 
+### Curated whitelist
+
+`whitelist.json` supplements automatic discovery for plugins that do not yet use
+the standalone release-driven convention.
+
+It supports two curated sources:
+
+- `repositories`: explicit GitHub repositories that should be processed through
+  the same latest-stable-release validation as automatically discovered plugins.
+- `catalogs`: existing plugin catalogs plus an explicit list of plugin IDs to
+  import from each catalog.
+
+Catalog imports are allowlisted by plugin ID; Plugin Hub never imports every entry
+from a remote catalog implicitly. The current whitelist imports the existing
+CrossPoint Plugin Store entries except its legacy `send2ereader` entry. The
+release-discovered `send2ereader.crosspoint-plugin` repository remains
+authoritative for that plugin ID.
+
+When an imported catalog entry points at a mutable GitHub Raw branch such as
+`main`, the builder resolves that branch to its current commit SHA and publishes
+the immutable SHA-based URL in Plugin Hub's generated catalog. The imported
+version still comes from the upstream catalog, so a future upstream version bump
+is detected automatically on the next refresh.
+
 ## Plugin requirements
 
 A discovered repository must have a stable GitHub Release whose tag is a numeric
@@ -94,16 +118,18 @@ A valid plugin must include `manifest.json` plus at least one of
 Development files such as tests, GitHub workflows, package metadata, and build
 scripts are not installed unless a plugin explicitly lists them in `files`.
 
-## Immutable releases
+## Immutable sources
 
-Catalog entries point to the exact GitHub release tag:
+Release-discovered catalog entries point to the exact GitHub release tag:
 
 ```text
 https://raw.githubusercontent.com/OWNER/REPOSITORY/v0.1.0/
 ```
 
-They never point at a mutable `main` branch. This keeps the catalog version and
-the files installed by CrossPoint tied to the same release.
+Curated entries imported from an existing catalog may begin with a mutable branch
+URL, but GitHub Raw branch URLs are resolved to the branch's current 40-character
+commit SHA before Plugin Hub publishes them. This keeps the generated catalog
+version and the files installed by CrossPoint tied to one immutable snapshot.
 
 ## Catalog refresh
 
@@ -112,9 +138,11 @@ manually. It:
 
 1. runs the catalog builder test suite;
 2. searches GitHub using the discovery rules above;
-3. validates each latest stable release;
-4. rebuilds `catalog.json`;
-5. commits the catalog only when its plugin contents changed.
+3. loads `whitelist.json` and imports only explicitly curated repositories and catalog plugin IDs;
+4. validates release-driven entries and pins mutable GitHub Raw bases from curated catalogs to commit SHAs;
+5. merges the sources, with release-discovered plugin IDs taking precedence over curated duplicates;
+6. rebuilds `catalog.json`;
+7. commits the catalog only when its plugin contents changed.
 
 The generated timestamp is preserved when the catalog contents are unchanged, so
 scheduled runs do not create timestamp-only commits.

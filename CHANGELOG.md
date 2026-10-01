@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Add `whitelist.json` support for explicitly curated repositories and imported catalog entries.
+- Import the existing CrossPoint Plugin Store entries except the legacy `send2ereader` entry.
+- Resolve mutable GitHub Raw branch URLs from curated catalogs to immutable commit-SHA URLs.
+- Prefer release-discovered plugins over curated catalog entries when the same plugin ID appears in both.
+
 ## 0.1.0
 
 - Add the initial Plugin Hub CrossPoint plugin.
