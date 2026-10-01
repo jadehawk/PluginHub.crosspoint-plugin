@@ -1,0 +1,53 @@
+name: Refresh Plugin Catalog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */3 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/build_catalog.py"
+      - "tests/**"
+      - ".github/workflows/refresh-catalog.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pluginhub-catalog
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run catalog tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build catalog
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python tools/build_catalog.py
+
+      - name: Commit catalog changes
+        shell: bash
+        run: |
+          if git diff --quiet -- catalog.json; then
+            echo "Catalog is unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json
+          git commit -m "chore: refresh plugin catalog"
+          git push
