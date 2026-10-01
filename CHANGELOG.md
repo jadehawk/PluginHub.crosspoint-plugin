@@ -9,3 +9,4 @@
 - Validate release and manifest versions before publishing a catalog entry.
 - Support explicit runtime file lists in `manifest.json`, with conventional CrossPoint files as the fallback.
 - Add automated catalog refreshes and catalog-builder tests.
+- Add a temporary bootstrap catalog for installing Plugin Hub through the existing CrossPoint Plugin Store before official catalog inclusion.

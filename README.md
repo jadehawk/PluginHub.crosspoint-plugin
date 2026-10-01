@@ -142,6 +142,18 @@ device.json
 README.md
 ```
 
+Until Plugin Hub is included in the default CrossPoint Plugin Store catalog, it
+can be bootstrapped through the existing Plugin Store by temporarily adding this
+Store URL:
+
+```text
+https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/bootstrap-catalog.json
+```
+
+That bootstrap catalog contains only Plugin Hub and installs the immutable
+`v0.1.0` release. After Plugin Hub is installed, the temporary bootstrap Store
+can be removed.
+
 Once Plugin Hub itself is installed, open it from:
 
 ```text
