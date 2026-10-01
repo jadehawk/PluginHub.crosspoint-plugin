@@ -38,8 +38,8 @@ To make your plugin eligible for Plugin Hub:
    `manifest.json`. If `files` is omitted, Plugin Hub only considers the
    conventional root files `manifest.json`, `device.json`, `plugin.js`, and
    `README.md`.
-6. Set a numeric version in `manifest.json`, for example `1.2.0` or
-   `0.1.2.1`.
+6. Set a three-part numeric `MAJOR.MINOR.PATCH` version in `manifest.json`,
+   for example `1.2.0`.
 7. Publish a **non-draft, non-prerelease GitHub Release** with a matching version
    tag, for example `v1.2.0` for manifest version `1.2.0`.
 8. Wait for the next Plugin Hub catalog refresh. The Action runs every three
@@ -108,8 +108,8 @@ For automatically discovered repositories and repositories explicitly listed
 under `whitelist.json -> repositories`:
 
 - The **latest stable GitHub Release** is the remote version source of truth.
-- Supported versions contain two to four numeric components, such as `1.2`,
-  `1.2.3`, or `1.2.3.4`.
+- Supported published versions use exactly three numeric components: `MAJOR.MINOR.PATCH`,
+  such as `1.2.3`.
 - The GitHub Release tag may optionally begin with `v`.
 - The root `manifest.json` version at that tag must match the Release version.
 - Plugin Hub publishes the normalized numeric version without the leading `v`.
@@ -344,8 +344,8 @@ publishers.
 
 ## Current firmware note
 
-Plugin Hub does not require a CrossPoint firmware change to function. Firmware
-with the current SD-plugin catalog implementation may label any installed/catalog
-version mismatch as an update, including when the installed version is newer than
-the catalog version. Directional version comparison is being handled separately
-in CrossPoint firmware.
+Plugin Hub does not require a CrossPoint firmware change to function. CrossPoint
+PR #3824 adds directional native catalog version comparison and defines plugin
+versions as three-part `MAJOR.MINOR.PATCH`. Plugin Hub now publishes only that
+three-part format. Older firmware may still label any installed/catalog version
+mismatch as an update until that firmware fix is present.

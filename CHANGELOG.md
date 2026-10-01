@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+- Standardize newly published Plugin Hub and discovered plugin versions on three-part `MAJOR.MINOR.PATCH` to match the CrossPoint firmware catalog contract.
+- Tighten catalog-builder validation so two-part and four-part release versions are rejected for new catalog entries.
+- Keep browser-side version comparison backward-compatible with legacy multi-part installed versions during migration.
+- Point the bootstrap catalog at the immutable `v0.1.2` Plugin Hub release.
+- Update the firmware note to reference CrossPoint PR #3824 for directional native version comparison.
+
 ## 0.1.1
 
 - Add `whitelist.json` support for explicitly curated repositories and imported catalog entries.

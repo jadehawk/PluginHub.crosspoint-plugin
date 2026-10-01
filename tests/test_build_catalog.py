@@ -25,10 +25,11 @@ class FakeClient:
 
 
 class CatalogBuilderTests(unittest.TestCase):
-    def test_normalize_version_supports_four_parts_and_v_prefix(self):
-        self.assertEqual(build_catalog.normalize_version("v0.1.1.2"), "0.1.1.2")
-        self.assertEqual(build_catalog.normalize_version("1.2"), "1.2")
+    def test_normalize_version_requires_three_parts_and_supports_v_prefix(self):
+        self.assertEqual(build_catalog.normalize_version("v0.1.2"), "0.1.2")
         self.assertEqual(build_catalog.normalize_version("1.2.3"), "1.2.3")
+        self.assertIsNone(build_catalog.normalize_version("1.2"))
+        self.assertIsNone(build_catalog.normalize_version("1.2.3.4"))
         self.assertIsNone(build_catalog.normalize_version("1"))
         self.assertIsNone(build_catalog.normalize_version("1.2.3.4.5"))
         self.assertIsNone(build_catalog.normalize_version("v1.2.3-beta"))
@@ -96,7 +97,7 @@ class CatalogBuilderTests(unittest.TestCase):
                 "title": "Send2Ereader",
                 "description": "Send books to CrossPoint.",
                 "author": "Jadehawk",
-                "version": "0.1.1.2",
+                "version": "0.1.2",
                 "files": ["manifest.json", "device.json", "plugin.js", "README.md"],
             },
             root=[
@@ -113,18 +114,18 @@ class CatalogBuilderTests(unittest.TestCase):
             "owner": {"login": "jadehawk"},
         }
         release = {
-            "tag_name": "v0.1.1.2",
-            "html_url": "https://github.com/jadehawk/send2ereader.xp-plugin/releases/tag/v0.1.1.2",
+            "tag_name": "v0.1.2",
+            "html_url": "https://github.com/jadehawk/send2ereader.xp-plugin/releases/tag/v0.1.2",
             "published_at": "2026-10-01T12:00:00Z",
         }
 
         entry = build_catalog.build_entry(client, repo, release)
 
         self.assertIsNotNone(entry)
-        self.assertEqual(entry["version"], "0.1.1.2")
+        self.assertEqual(entry["version"], "0.1.2")
         self.assertEqual(
             entry["base"],
-            "https://raw.githubusercontent.com/jadehawk/send2ereader.xp-plugin/v0.1.1.2/",
+            "https://raw.githubusercontent.com/jadehawk/send2ereader.xp-plugin/v0.1.2/",
         )
         self.assertEqual(entry["files"], client.manifest["files"])
 

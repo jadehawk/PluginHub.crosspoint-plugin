@@ -1,7 +1,7 @@
 {
   "name": "Plugin Hub",
   "schema_version": 1,
-  "generated_at": "2026-10-01T20:36:12Z",
+  "generated_at": "2026-10-01T23:47:59Z",
   "plugins": [
     {
       "name": "bookfusion",
@@ -10,7 +10,7 @@
       "author": "Diirge",
       "version": "1.2.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/bookfusion/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/bookfusion/",
       "files": [
         "manifest.json",
         "device.json",
@@ -25,7 +25,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/dictionaries/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/dictionaries/",
       "files": [
         "manifest.json",
         "device.json",
@@ -40,7 +40,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/hello/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/hello/",
       "files": [
         "manifest.json",
         "plugin.js"
@@ -65,9 +65,9 @@
       "title": "Plugin Store",
       "description": "Browse and install plugins from a hosted catalog.",
       "author": "Diirge",
-      "version": "1.1.2",
+      "version": "1.1.3",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/plugin-store/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/plugin-store/",
       "files": [
         "manifest.json",
         "device.json",
@@ -93,12 +93,12 @@
       "title": "Send2Ereader",
       "description": "Create or join a Send2Ereader session and receive books on CrossPoint.",
       "author": "Jadehawk",
-      "version": "0.1.2.1",
+      "version": "0.1.3",
       "repository": "jadehawk/send2ereader.crosspoint-plugin",
-      "release": "v0.1.2.1",
-      "release_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.2.1",
-      "published_at": "2026-10-01T18:25:24Z",
-      "base": "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.2.1/",
+      "release": "v0.1.3",
+      "release_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.3",
+      "published_at": "2026-10-01T23:46:45Z",
+      "base": "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.3/",
       "files": [
         "manifest.json",
         "device.json",
@@ -113,7 +113,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/organize-by-author/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/organize-by-author/",
       "files": [
         "manifest.json",
         "plugin.js",
@@ -127,7 +127,7 @@
       "author": "Diirge",
       "version": "1.2.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/wallabag/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/wallabag/",
       "files": [
         "manifest.json",
         "device.json",
@@ -142,7 +142,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/webdav/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/7525438bc9c41bd10f158f39810ed3d29af7e106/webdav/",
       "files": [
         "manifest.json",
         "device.json",

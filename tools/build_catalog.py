@@ -22,7 +22,7 @@ SEARCH_QUERIES = (
     'in:name "crosspoint-plugin"',
 )
 CONVENTIONAL_FILES = ("manifest.json", "device.json", "plugin.js", "README.md")
-VERSION_RE = re.compile(r"^[vV]?(\d+(?:\.\d+){1,3})$")
+VERSION_RE = re.compile(r"^[vV]?(\d+\.\d+\.\d+)$")
 PLUGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 RAW_GITHUB_BASE_RE = re.compile(
     r"^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/(.+)$"
