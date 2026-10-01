@@ -1,7 +1,7 @@
 {
   "name": "Plugin Hub",
   "schema_version": 1,
-  "generated_at": "2026-10-01T20:07:50Z",
+  "generated_at": "2026-10-01T20:36:12Z",
   "plugins": [
     {
       "name": "bookfusion",
@@ -10,7 +10,7 @@
       "author": "Diirge",
       "version": "1.2.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/bookfusion/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/bookfusion/",
       "files": [
         "manifest.json",
         "device.json",
@@ -25,7 +25,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/dictionaries/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/dictionaries/",
       "files": [
         "manifest.json",
         "device.json",
@@ -40,7 +40,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/hello/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/hello/",
       "files": [
         "manifest.json",
         "plugin.js"
@@ -67,7 +67,7 @@
       "author": "Diirge",
       "version": "1.1.2",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/plugin-store/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/plugin-store/",
       "files": [
         "manifest.json",
         "device.json",
@@ -80,7 +80,7 @@
       "title": "Protected Content",
       "description": "Fulfill protected content from an online provider.",
       "author": "Diirge",
-      "version": "1.0.4",
+      "version": "1.0.5",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
       "base": "https://protected-content-host-production.up.railway.app/",
       "files": [
@@ -113,7 +113,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/organize-by-author/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/organize-by-author/",
       "files": [
         "manifest.json",
         "plugin.js",
@@ -127,7 +127,7 @@
       "author": "Diirge",
       "version": "1.2.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/wallabag/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/wallabag/",
       "files": [
         "manifest.json",
         "device.json",
@@ -142,7 +142,7 @@
       "author": "Diirge",
       "version": "1.0.0",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/37d7e042c9152e40ad82f5c18942a841b5ae3627/webdav/",
+      "base": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/48b72e396505b0f82309e84f784d9c04c35c17ca/webdav/",
       "files": [
         "manifest.json",
         "device.json",
