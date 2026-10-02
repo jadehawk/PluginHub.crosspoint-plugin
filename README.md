@@ -19,8 +19,10 @@ Actions does the heavier discovery work off-device.
 6. CrossPoint installs each selected bundle under
    `/.crosspoint/plugins/<plugin-id>/`.
 
-Plugin Hub itself contains no on-device JavaScript. Installation and updating are
-handled by CrossPoint's existing declarative `device.json` bundle installer.
+Plugin Hub uses both CrossPoint plugin surfaces: `device.json` provides the
+on-reader catalog, while `plugin.js` provides the browser-side management UI.
+Installation and updating still use CrossPoint's existing declarative bundle
+installer.
 
 ## Get your plugin listed
 
@@ -73,6 +75,11 @@ The recommended `name` format is lowercase letters, digits, and hyphens. If
 `name` is missing or unusable, Plugin Hub attempts to derive the plugin ID from
 the repository name by stripping `.xp-plugin`, `.crosspoint-plugin`, or
 `-crosspoint-plugin`.
+
+For automatically discovered repositories, the preferred display title comes from
+`manifest.json -> title`. If that field is missing or not a string, Plugin Hub
+falls back to the GitHub repository name. For curated catalog imports, a missing
+or empty source title falls back to the plugin ID.
 
 Development files such as tests, GitHub workflows, package metadata, and build
 scripts are not installed unless a plugin explicitly lists them in `files`.

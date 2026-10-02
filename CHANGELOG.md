@@ -1,11 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.1.3
 
 - Add a release-promotion workflow that moves the `stable` branch to each published non-prerelease Plugin Hub release.
 - Allow the stable-promotion workflow to run manually for a specific published stable tag or the latest stable Release.
-- Package every stable release as `pluginhub-X.Y.Z.zip`, expanding to `.crosspoint/plugins/pluginhub/` for direct SD-card installation without Plugin Store.
 - Make the bootstrap catalog versionless and point it at `stable`, so fresh installs receive the latest stable Plugin Hub without future catalog PRs.
+- Rename the bootstrap catalog heading to `Plugin Hub` so users do not see the internal bootstrap label.
+- Package every stable release as `pluginhub-X.Y.Z.zip`, expanding to `.crosspoint/plugins/pluginhub/` for direct SD-card installation without Plugin Store.
+- Allow the release-package workflow to be run manually for a specific stable tag or the latest stable Release.
+- Document direct SD-card installation, the firmware's in-place plugin loading behavior, and the catalog ID/title fallback rules.
+- Correct the README to describe both the on-reader `device.json` catalog and browser-side `plugin.js` management UI.
 
 ## 0.1.2
 

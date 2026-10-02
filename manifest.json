@@ -4,7 +4,7 @@
   "mount": "settings",
   "description": "Discover, install, and update CrossPoint community plugins.",
   "author": "Jadehawk",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "files": [
     "manifest.json",
     "device.json",
