@@ -222,6 +222,12 @@ manually. It:
 The generated timestamp is preserved when the catalog contents are unchanged, so
 scheduled runs do not create timestamp-only commits.
 
+Separately, the `Promote Stable Plugin Hub Release` workflow moves the `stable`
+branch to the exact commit behind each newly published non-prerelease Release.
+That moving branch is used only as a bootstrap/install pointer; released plugin
+artifacts and generated community catalog entries remain pinned to immutable tags
+or commit SHAs.
+
 ## Local validation
 
 No third-party Python packages are required. Node.js is used for the browser-side
@@ -256,8 +262,10 @@ Store URL:
 https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/bootstrap-catalog.json
 ```
 
-The bootstrap catalog installs the immutable Plugin Hub release. After Plugin Hub
-is installed, the temporary bootstrap Store can be removed.
+The bootstrap catalog points to the `stable` branch, which advances only when a
+non-prerelease GitHub Release is published. Fresh installs therefore receive the
+latest stable Plugin Hub without tracking unreleased `main` commits. After Plugin
+Hub is installed, the temporary bootstrap Store can be removed.
 
 ### On the reader
 

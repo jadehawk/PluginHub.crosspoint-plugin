@@ -1,0 +1,29 @@
+name: Promote Stable Plugin Hub Release
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  promote:
+    if: ${{ github.event.release.draft == false && github.event.release.prerelease == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Point stable at published release
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          git fetch origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          release_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+          test -n "$release_commit"
+          git push --force origin "$release_commit:refs/heads/stable"

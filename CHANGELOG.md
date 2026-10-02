@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add a release-promotion workflow that moves the `stable` branch to each published non-prerelease Plugin Hub release.
+- Make the bootstrap catalog versionless and point it at `stable`, so fresh installs receive the latest stable Plugin Hub without future catalog PRs.
+
 ## 0.1.2
 
 - Standardize newly published Plugin Hub and discovered plugin versions on three-part `MAJOR.MINOR.PATCH` to match the CrossPoint firmware catalog contract.
