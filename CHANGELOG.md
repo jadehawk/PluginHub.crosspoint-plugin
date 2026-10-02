@@ -4,6 +4,7 @@
 
 - Add a release-promotion workflow that moves the `stable` branch to each published non-prerelease Plugin Hub release.
 - Allow the stable-promotion workflow to run manually for a specific published stable tag or the latest stable Release.
+- Package every stable release as `pluginhub-X.Y.Z.zip`, expanding to `.crosspoint/plugins/pluginhub/` for direct SD-card installation without Plugin Store.
 - Make the bootstrap catalog versionless and point it at `stable`, so fresh installs receive the latest stable Plugin Hub without future catalog PRs.
 
 ## 0.1.2

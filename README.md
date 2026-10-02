@@ -256,9 +256,31 @@ plugin.js
 README.md
 ```
 
+### Direct SD-card install
+
+Each stable GitHub Release includes a `pluginhub-X.Y.Z.zip` asset for users who
+do not want to install Plugin Store first.
+
+Extract the ZIP at the root of the SD card. It expands to:
+
+```text
+.crosspoint/
+└── plugins/
+    └── pluginhub/
+        ├── manifest.json
+        ├── device.json
+        ├── plugin.js
+        └── README.md
+```
+
+CrossPoint scans `/.crosspoint/plugins` directly, so the plugin runs from that
+location; the firmware does not copy it to another plugin directory.
+
+### Install through Plugin Store
+
 Until Plugin Hub is included in the default CrossPoint Plugin Store catalog, it
-can be bootstrapped through the existing Plugin Store by temporarily adding this
-Store URL:
+can also be bootstrapped through the existing Plugin Store by temporarily adding
+this Store URL:
 
 ```text
 https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/bootstrap-catalog.json

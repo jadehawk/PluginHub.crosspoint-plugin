@@ -1,0 +1,60 @@
+name: Package Plugin Hub Release
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Stable release tag to package (leave blank for latest)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.release.draft == false && github.event.release.prerelease == false) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build and upload SD-card package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+        run: |
+          release_tag="$REQUESTED_TAG"
+
+          if [ -z "$release_tag" ]; then
+            release_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')"
+          fi
+
+          published_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag" --jq 'select(.draft == false and .prerelease == false) | .tag_name')"
+          if [ "$published_tag" != "$release_tag" ]; then
+            echo "Refusing to package '$release_tag': it is not a published stable GitHub Release."
+            exit 1
+          fi
+
+          git fetch --force origin "refs/tags/$release_tag:refs/tags/$release_tag"
+
+          version="${release_tag#v}"
+          asset="pluginhub-${version}.zip"
+
+          git archive \
+            --format=zip \
+            --prefix=".crosspoint/plugins/pluginhub/" \
+            --output="$asset" \
+            "$release_tag" \
+            manifest.json device.json plugin.js README.md
+
+          echo "Package contents:"
+          unzip -Z1 "$asset"
+
+          gh release upload "$release_tag" "$asset" --clobber
