@@ -223,3 +223,79 @@ test('browser hub loads custom catalogs and only offers directional updates', as
   assert.equal(privateButton.textContent, 'Install');
   assert.match(document.elements['ph-status'].textContent, /3 plugins available, 1 update/);
 });
+
+test('browser hub adopts api.dir while migrating legacy config', async () => {
+  const document = fakeDocument();
+  const writes = [];
+  const downloadPaths = [];
+  const relayCalls = [];
+
+  async function fetch(url) {
+    if (url.startsWith('/download?path=')) {
+      const path = new URL(url, 'http://device').searchParams.get('path');
+      downloadPaths.push(path);
+      if (path === '/plugins/pluginhub/config.json') {
+        return response({ status: 404 });
+      }
+      if (path === '/.crosspoint/plugin-hub.json') {
+        return response({
+          text: JSON.stringify({ extraCatalogs: [PRIVATE_CATALOG] }),
+        });
+      }
+      if (path === '/plugins/pluginhub/manifest.json') {
+        return response({ text: JSON.stringify({ version: '0.1.4' }) });
+      }
+      return response({ status: 404 });
+    }
+
+    if (url.startsWith('/api/files?path=')) {
+      return response({ json: [] });
+    }
+
+    throw new Error('unexpected fetch: ' + url);
+  }
+
+  const api = {
+    dir: '/plugins/pluginhub/',
+    async writeFile(path, dataB64) {
+      writes.push({
+        path,
+        data: Buffer.from(dataB64, 'base64').toString('utf8'),
+      });
+      return { ok: true };
+    },
+    async relay(method, url) {
+      assert.equal(method, 'GET');
+      relayCalls.push(url);
+      if (url.includes('/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest')) {
+        return { status: 200, body: JSON.stringify({ tag_name: 'v0.1.4' }) };
+      }
+      if (url === DEFAULT_CATALOG) {
+        return { status: 200, body: JSON.stringify({ name: 'Plugin Hub', plugins: [] }) };
+      }
+      if (url === PRIVATE_CATALOG) {
+        return { status: 200, body: JSON.stringify({ name: 'Private', plugins: [] }) };
+      }
+      return { status: 404, body: '' };
+    },
+    async fetchToSd() {
+      return { status: 200 };
+    },
+  };
+
+  const render = await loadPlugin({ document, fetch });
+  await render({ innerHTML: '' }, api);
+
+  assert.deepEqual(downloadPaths.slice(0, 3), [
+    '/plugins/pluginhub/config.json',
+    '/.crosspoint/plugin-hub.json',
+    '/plugins/pluginhub/manifest.json',
+  ]);
+  assert.equal(document.elements['ph-version'].textContent, 'Version: v0.1.4');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, '/plugins/pluginhub/config.json');
+  assert.deepEqual(JSON.parse(writes[0].data), {
+    extraCatalogs: [PRIVATE_CATALOG],
+  });
+  assert.deepEqual(relayCalls.slice(1), [DEFAULT_CATALOG, PRIVATE_CATALOG]);
+});

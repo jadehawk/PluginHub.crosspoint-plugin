@@ -1,7 +1,12 @@
 // Plugin Hub browser UI — manage CrossPoint plugins from the generated Hub
 // catalog plus optional user-supplied catalogs.
 CrossPoint.registerPlugin(async (container, api) => {
-  const CONFIG_PATH = '/.crosspoint/plugin-hub.json';
+  const LEGACY_CONFIG_PATH = '/.crosspoint/plugin-hub.json';
+  const PLUGIN_DIR =
+    api && typeof api.dir === 'string' && api.dir.startsWith('/')
+      ? api.dir.replace(/\/+$/, '')
+      : null;
+  const CONFIG_PATH = PLUGIN_DIR ? PLUGIN_DIR + '/config.json' : LEGACY_CONFIG_PATH;
   const PLUGINS_DIR = '/.crosspoint/plugins';
   const RELEASE_API_URL = 'https://api.github.com/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest';
   const DEFAULT_CATALOG =
@@ -63,14 +68,25 @@ CrossPoint.registerPlugin(async (container, api) => {
     return urls;
   }
 
-  async function loadConfig() {
+  async function readJsonFile(path) {
     try {
-      const response = await fetch('/download?path=' + encodeURIComponent(CONFIG_PATH));
-      if (!response.ok) return {};
+      const response = await fetch('/download?path=' + encodeURIComponent(path));
+      if (!response.ok) return null;
       return JSON.parse(await response.text());
     } catch (e) {
-      return {};
+      return null;
     }
+  }
+
+  async function loadConfig() {
+    const current = await readJsonFile(CONFIG_PATH);
+    if (current) return current;
+
+    if (CONFIG_PATH !== LEGACY_CONFIG_PATH) {
+      const legacy = await readJsonFile(LEGACY_CONFIG_PATH);
+      if (legacy) return legacy;
+    }
+    return {};
   }
 
   function saveConfig() {
@@ -94,14 +110,16 @@ CrossPoint.registerPlugin(async (container, api) => {
   }
 
   async function installedVersion(name) {
-    try {
-      const path = PLUGINS_DIR + '/' + name + '/manifest.json';
-      const response = await fetch('/download?path=' + encodeURIComponent(path));
-      if (!response.ok) return null;
-      return (JSON.parse(await response.text()).version) || null;
-    } catch (e) {
-      return null;
+    const manifest = await readJsonFile(PLUGINS_DIR + '/' + name + '/manifest.json');
+    return manifest && manifest.version ? manifest.version : null;
+  }
+
+  async function hubInstalledVersion() {
+    if (PLUGIN_DIR) {
+      const manifest = await readJsonFile(PLUGIN_DIR + '/manifest.json');
+      if (manifest && manifest.version) return manifest.version;
     }
+    return installedVersion('pluginhub');
   }
 
   function numericVersion(version) {
@@ -146,7 +164,7 @@ CrossPoint.registerPlugin(async (container, api) => {
 
   async function checkHubVersion() {
     const versionEl = document.getElementById('ph-version');
-    const installed = String((await installedVersion('pluginhub')) || '').trim();
+    const installed = String((await hubInstalledVersion()) || '').trim();
     if (!numericVersion(installed)) {
       versionEl.textContent = 'Version: unavailable';
       return;

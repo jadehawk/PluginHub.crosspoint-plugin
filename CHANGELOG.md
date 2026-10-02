@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.4
+
+- Adopt the newer firmware `api.dir` plugin-directory API when available without requiring it on older firmware.
+- Store Plugin Hub configuration as plugin-local `config.json` on newer firmware, while retaining `/.crosspoint/plugin-hub.json` as the compatibility fallback.
+- Migrate legacy catalog settings by reading the old config when plugin-local config is absent, then saving future changes to the plugin directory without deleting the legacy file.
+- Read Plugin Hub's own `manifest.json` from its actual runtime directory for self-version detection, with the legacy `/.crosspoint/plugins/pluginhub` lookup retained as a fallback.
+- Add browser regression coverage for both the legacy API shape and the newer `api.dir` migration path.
+
 ## 0.1.3
 
 - Add a release-promotion workflow that moves the `stable` branch to each published non-prerelease Plugin Hub release.

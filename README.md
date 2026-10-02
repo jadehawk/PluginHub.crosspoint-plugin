@@ -329,11 +329,27 @@ browser card.
 #### Add custom, test, or private catalogs
 
 Under **Catalogs**, add any additional catalog URL and choose **Save & refresh**.
-The URL is stored on the SD card in:
+
+On firmware that provides the newer plugin-directory API, Plugin Hub stores its
+configuration inside its actual plugin directory as `config.json`. This keeps the
+configuration with the plugin regardless of whether it is loaded from
+`/.crosspoint/plugins`, `/plugins`, or `/.plugins`.
+
+On older firmware that does not provide `api.dir`, Plugin Hub remains compatible
+with the legacy config path:
 
 ```text
 /.crosspoint/plugin-hub.json
 ```
+
+When a newer firmware first exposes `api.dir`, Plugin Hub checks the plugin-local
+`config.json` first, then falls back to the legacy file. If the legacy file is
+used, the next save writes the same settings to the plugin-local config without
+deleting the legacy file, preserving downgrade compatibility.
+
+Plugin Hub also uses `api.dir` when available to read its own `manifest.json`
+for self-version detection, with the legacy `/.crosspoint/plugins/pluginhub`
+lookup retained as a fallback.
 
 Additional catalogs are loaded alongside the built-in Plugin Hub catalog and each
 catalog is shown under its own heading. A custom catalog can be hosted on GitHub
