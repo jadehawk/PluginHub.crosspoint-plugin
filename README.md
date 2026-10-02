@@ -224,9 +224,11 @@ scheduled runs do not create timestamp-only commits.
 
 Separately, the `Promote Stable Plugin Hub Release` workflow moves the `stable`
 branch to the exact commit behind each newly published non-prerelease Release.
-That moving branch is used only as a bootstrap/install pointer; released plugin
-artifacts and generated community catalog entries remain pinned to immutable tags
-or commit SHAs.
+It can also be run manually from GitHub Actions. A manually supplied stable tag is
+validated before promotion; leaving the tag blank promotes the latest published
+stable Release. That moving branch is used only as a bootstrap/install pointer;
+released plugin artifacts and generated community catalog entries remain pinned to
+immutable tags or commit SHAs.
 
 ## Local validation
 

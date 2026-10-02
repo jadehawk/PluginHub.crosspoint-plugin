@@ -4,13 +4,19 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Stable release tag to promote (leave blank for latest)"
+        required: false
+        type: string
 
 permissions:
   contents: write
 
 jobs:
   promote:
-    if: ${{ github.event.release.draft == false && github.event.release.prerelease == false }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.release.draft == false && github.event.release.prerelease == false) }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -21,9 +27,24 @@ jobs:
       - name: Point stable at published release
         shell: bash
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
         run: |
-          git fetch origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
-          release_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+          release_tag="$REQUESTED_TAG"
+
+          if [ -z "$release_tag" ]; then
+            release_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name')"
+          fi
+
+          published_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$release_tag" --jq 'select(.draft == false and .prerelease == false) | .tag_name')"
+          if [ "$published_tag" != "$release_tag" ]; then
+            echo "Refusing to promote '$release_tag': it is not a published stable GitHub Release."
+            exit 1
+          fi
+
+          git fetch --force origin "refs/tags/$release_tag:refs/tags/$release_tag"
+          release_commit="$(git rev-list -n 1 "$release_tag")"
           test -n "$release_commit"
+
+          echo "Promoting stable -> $release_tag ($release_commit)"
           git push --force origin "$release_commit:refs/heads/stable"
