@@ -1,7 +1,7 @@
 {
   "name": "Plugin Hub",
   "schema_version": 1,
-  "generated_at": "2026-10-04T18:53:52Z",
+  "generated_at": "2026-10-04T23:58:46Z",
   "plugins": [
     {
       "name": "bookfusion",
@@ -93,13 +93,13 @@
       "title": "Readest",
       "description": "Your Readest library, reading statistics and reading progress on CrossPoint.",
       "author": "Readest",
-      "version": "0.12.10",
+      "version": "0.12.12",
       "repository": "readest/readest",
-      "release": "v0.12.10",
-      "release_url": "https://github.com/readest/readest/releases/tag/v0.12.10",
-      "release_asset": "Readest-0.12.10.crosspoint-plugin.zip",
-      "published_at": "2026-09-21T20:55:32Z",
-      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/release-assets/readest/0.12.10/",
+      "release": "v0.12.12",
+      "release_url": "https://github.com/readest/readest/releases/tag/v0.12.12",
+      "release_asset": "Readest-0.12.12.crosspoint-plugin.zip",
+      "published_at": "2026-10-04T21:14:17Z",
+      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/release-assets/readest/0.12.12/",
       "files": [
         "manifest.json",
         "device.json",
