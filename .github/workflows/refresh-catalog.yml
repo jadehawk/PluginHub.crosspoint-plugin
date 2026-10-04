@@ -51,16 +51,16 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: python tools/build_catalog.py
 
-      - name: Commit catalog changes
+      - name: Commit catalog and release-asset changes
         shell: bash
         run: |
-          if git diff --quiet -- catalog.json; then
-            echo "Catalog is unchanged."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add catalog.json
+          git add catalog.json release-assets
+          if git diff --cached --quiet; then
+            echo "Catalog and release-asset mirror are unchanged."
+            exit 0
+          fi
           git commit -m "chore: refresh plugin catalog"
           git pull --rebase origin main
           git push origin HEAD:main

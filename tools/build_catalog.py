@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 import datetime as dt
+import io
 import json
 import os
 import re
@@ -13,6 +14,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -24,9 +26,17 @@ SEARCH_QUERIES = (
 CONVENTIONAL_FILES = ("manifest.json", "device.json", "plugin.js", "README.md")
 VERSION_RE = re.compile(r"^[vV]?(\d+\.\d+\.\d+)$")
 PLUGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 RAW_GITHUB_BASE_RE = re.compile(
     r"^https://raw\.githubusercontent\.com/([^/]+)/([^/]+)/(.+)$"
 )
+RELEASE_ASSET_SUFFIX = ".crosspoint-plugin.zip"
+RELEASE_ASSET_MIRROR_DIR = "release-assets"
+MAX_RELEASE_ASSET_BYTES = 16 * 1024 * 1024
+MAX_ARCHIVE_MEMBERS = 256
+MAX_ARCHIVE_UNCOMPRESSED_BYTES = 32 * 1024 * 1024
+MAX_PLUGIN_FILE_BYTES = 8 * 1024 * 1024
+MAX_PLUGIN_TOTAL_BYTES = 16 * 1024 * 1024
 
 
 class CatalogError(RuntimeError):
@@ -79,14 +89,29 @@ class GitHubClient:
                 break
         return repositories
 
+    def stable_releases(self, full_name: str, max_pages: int = 3) -> list[dict[str, Any]]:
+        stable: list[dict[str, Any]] = []
+        for page in range(1, max_pages + 1):
+            releases = self._request_json(
+                f"/repos/{full_name}/releases",
+                {"per_page": 100, "page": page},
+            )
+            if not isinstance(releases, list):
+                raise CatalogError(f"GitHub releases response is invalid for {full_name}")
+            stable.extend(
+                release
+                for release in releases
+                if isinstance(release, dict)
+                and not release.get("draft")
+                and not release.get("prerelease")
+            )
+            if len(releases) < 100:
+                break
+        return stable
+
     def latest_stable_release(self, full_name: str) -> dict[str, Any] | None:
-        releases = self._request_json(f"/repos/{full_name}/releases", {"per_page": 20})
-        if not isinstance(releases, list):
-            raise CatalogError(f"GitHub releases response is invalid for {full_name}")
-        for release in releases:
-            if isinstance(release, dict) and not release.get("draft") and not release.get("prerelease"):
-                return release
-        return None
+        releases = self.stable_releases(full_name, max_pages=1)
+        return releases[0] if releases else None
 
     def root_contents(self, full_name: str, ref: str) -> list[dict[str, Any]]:
         payload = self._request_json(f"/repos/{full_name}/contents", {"ref": ref})
@@ -155,6 +180,34 @@ class GitHubClient:
             raise CatalogError(f"JSON root must be an object: {url}")
         return payload
 
+    def fetch_bytes_url(self, url: str, max_bytes: int = MAX_RELEASE_ASSET_BYTES) -> bytes:
+        headers = {
+            "Accept": "application/octet-stream",
+            "User-Agent": "PluginHub.crosspoint-plugin catalog builder",
+        }
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=60) as response:
+                content_length = response.headers.get("Content-Length")
+                if content_length:
+                    try:
+                        if int(content_length) > max_bytes:
+                            raise CatalogError(f"release asset exceeds {max_bytes} bytes: {url}")
+                    except ValueError:
+                        pass
+                payload = response.read(max_bytes + 1)
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            error_type = GitHubRateLimitError if exc.code in (403, 429) else CatalogError
+            raise error_type(f"HTTP {exc.code} for {url}: {body[:500]}") from exc
+        except urllib.error.URLError as exc:
+            raise CatalogError(f"Request failed for {url}: {exc}") from exc
+        if len(payload) > max_bytes:
+            raise CatalogError(f"release asset exceeds {max_bytes} bytes: {url}")
+        return payload
+
 
 def normalize_version(tag: str) -> str | None:
     match = VERSION_RE.fullmatch(tag.strip())
@@ -204,7 +257,7 @@ def safe_runtime_files(manifest: dict[str, Any], root_names: set[str]) -> list[s
 
 def load_whitelist(path: Path) -> dict[str, Any]:
     if not path.exists():
-        return {"repositories": [], "catalogs": []}
+        return {"repositories": [], "release_asset_repositories": [], "catalogs": []}
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -213,15 +266,27 @@ def load_whitelist(path: Path) -> dict[str, Any]:
         raise CatalogError("whitelist root must be an object")
 
     repositories = payload.get("repositories", [])
+    release_asset_repositories = payload.get("release_asset_repositories", [])
     catalogs = payload.get("catalogs", [])
     if not isinstance(repositories, list) or not all(
-        isinstance(item, str) and "/" in item for item in repositories
+        isinstance(item, str) and REPOSITORY_RE.fullmatch(item) for item in repositories
     ):
         raise CatalogError("whitelist repositories must be owner/repository strings")
+    if not isinstance(release_asset_repositories, list) or not all(
+        isinstance(item, str) and REPOSITORY_RE.fullmatch(item)
+        for item in release_asset_repositories
+    ):
+        raise CatalogError(
+            "whitelist release_asset_repositories must be owner/repository strings"
+        )
     if not isinstance(catalogs, list) or not all(isinstance(item, dict) for item in catalogs):
         raise CatalogError("whitelist catalogs must be objects")
 
-    return {"repositories": repositories, "catalogs": catalogs}
+    return {
+        "repositories": repositories,
+        "release_asset_repositories": release_asset_repositories,
+        "catalogs": catalogs,
+    }
 
 
 def pin_raw_github_base(client: GitHubClient, base: str) -> str:
@@ -316,12 +381,298 @@ def curated_catalog_plugins(client: GitHubClient, whitelist: dict[str, Any]) -> 
     return imported
 
 
+def matching_release_assets(release: dict[str, Any]) -> list[dict[str, Any]]:
+    assets = release.get("assets", [])
+    if not isinstance(assets, list):
+        raise CatalogError("GitHub release assets must be a list")
+    matching = [
+        asset
+        for asset in assets
+        if isinstance(asset, dict)
+        and isinstance(asset.get("name"), str)
+        and asset["name"].lower().endswith(RELEASE_ASSET_SUFFIX)
+    ]
+    return sorted(matching, key=lambda asset: asset["name"].casefold())
+
+
+def _safe_archive_member_name(name: str) -> str | None:
+    candidate = name[:-1] if name.endswith("/") else name
+    if not candidate or candidate.startswith("/") or "\\" in candidate:
+        return None
+    parts = candidate.split("/")
+    if any(part in ("", ".", "..") for part in parts):
+        return None
+    return candidate
+
+
+def _is_zip_symlink(info: zipfile.ZipInfo) -> bool:
+    if info.create_system != 3:
+        return False
+    return ((info.external_attr >> 16) & 0o170000) == 0o120000
+
+
+def inspect_release_asset(
+    archive_bytes: bytes,
+    repository: str,
+    asset_name: str,
+) -> tuple[dict[str, Any], list[str], dict[str, bytes]]:
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(archive_bytes))
+    except zipfile.BadZipFile as exc:
+        raise CatalogError(f"{repository} asset {asset_name!r} is not a valid ZIP") from exc
+
+    with archive:
+        infos = archive.infolist()
+        if len(infos) > MAX_ARCHIVE_MEMBERS:
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} has too many archive members"
+            )
+
+        members: dict[str, zipfile.ZipInfo] = {}
+        casefolded: set[str] = set()
+        total_uncompressed = 0
+        for info in infos:
+            safe_name = _safe_archive_member_name(info.filename)
+            if safe_name is None:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} contains an unsafe path {info.filename!r}"
+                )
+            if info.flag_bits & 0x1:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} contains encrypted files"
+                )
+            if _is_zip_symlink(info):
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} contains a symbolic link"
+                )
+            if info.is_dir():
+                continue
+            folded = safe_name.casefold()
+            if safe_name in members or folded in casefolded:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} contains duplicate paths"
+                )
+            members[safe_name] = info
+            casefolded.add(folded)
+            total_uncompressed += info.file_size
+            if total_uncompressed > MAX_ARCHIVE_UNCOMPRESSED_BYTES:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} is too large after extraction"
+                )
+
+        candidates: list[tuple[str, str]] = []
+        for path in members:
+            if path == "manifest.json":
+                root = ""
+            elif path.endswith("/manifest.json"):
+                root = path[: -len("manifest.json")]
+            else:
+                continue
+            if f"{root}device.json" in members or f"{root}plugin.js" in members:
+                candidates.append((path, root))
+
+        if len(candidates) != 1:
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} must contain exactly one CrossPoint plugin root"
+            )
+
+        manifest_path, root = candidates[0]
+        manifest_info = members[manifest_path]
+        if manifest_info.file_size > MAX_PLUGIN_FILE_BYTES:
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} manifest is unexpectedly large"
+            )
+        try:
+            manifest = json.loads(archive.read(manifest_info).decode("utf-8"))
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} has an invalid manifest.json"
+            ) from exc
+        if not isinstance(manifest, dict):
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} manifest.json must be an object"
+            )
+
+        manifest_version = manifest.get("version")
+        if not isinstance(manifest_version, str) or normalize_version(manifest_version) is None:
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} has an invalid manifest version"
+            )
+
+        plugin_id = manifest.get("name")
+        if not isinstance(plugin_id, str) or PLUGIN_ID_RE.fullmatch(plugin_id) is None:
+            root_name = root.rstrip("/").split("/")[-1] if root else ""
+            plugin_id = derive_plugin_id(root_name, {}) if root_name else None
+            if plugin_id is None:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} must declare a safe manifest name "
+                    "or use a safe plugin directory name"
+                )
+            manifest = dict(manifest)
+            manifest["name"] = plugin_id
+
+        relative_members = {
+            path[len(root) :]
+            for path in members
+            if path.startswith(root) and len(path) > len(root)
+        }
+        root_names = {path for path in relative_members if "/" not in path}
+        files = safe_runtime_files(manifest, root_names)
+        if files is None:
+            raise CatalogError(
+                f"{repository} asset {asset_name!r} manifest files are missing or unsafe"
+            )
+
+        payloads: dict[str, bytes] = {}
+        total_plugin_bytes = 0
+        for relative_path in files:
+            member_path = f"{root}{relative_path}"
+            info = members.get(member_path)
+            if info is None:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} is missing declared file {relative_path!r}"
+                )
+            if info.file_size > MAX_PLUGIN_FILE_BYTES:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} file {relative_path!r} is too large"
+                )
+            total_plugin_bytes += info.file_size
+            if total_plugin_bytes > MAX_PLUGIN_TOTAL_BYTES:
+                raise CatalogError(
+                    f"{repository} asset {asset_name!r} plugin payload is too large"
+                )
+            payloads[relative_path] = archive.read(info)
+
+    return manifest, files, payloads
+
+
+def mirror_plugin_payload(
+    mirror_root: Path,
+    plugin_id: str,
+    version: str,
+    payloads: dict[str, bytes],
+) -> Path:
+    target = mirror_root / plugin_id / version
+    if target.exists():
+        existing = {
+            path.relative_to(target).as_posix(): path.read_bytes()
+            for path in target.rglob("*")
+            if path.is_file()
+        }
+        if existing != payloads:
+            raise CatalogError(
+                f"refusing to rewrite mirrored {plugin_id} {version}; publish a new plugin version"
+            )
+        return target
+
+    for relative_path, payload in payloads.items():
+        destination = target.joinpath(*relative_path.split("/"))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+    return target
+
+
+def release_asset_plugins(
+    client: GitHubClient,
+    repositories: list[str],
+    catalog_repository: str,
+    mirror_root: Path,
+) -> list[dict[str, Any]]:
+    if not repositories:
+        return []
+    if REPOSITORY_RE.fullmatch(catalog_repository) is None:
+        raise CatalogError("catalog repository must be an owner/repository string")
+
+    plugins: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    for full_name in repositories:
+        repo = client.repository(full_name)
+        if repo.get("archived") or repo.get("disabled"):
+            raise CatalogError(f"configured release-asset repository is unavailable: {full_name}")
+
+        selected_release: dict[str, Any] | None = None
+        selected_assets: list[dict[str, Any]] = []
+        for release in client.stable_releases(full_name):
+            assets = matching_release_assets(release)
+            if assets:
+                selected_release = release
+                selected_assets = assets
+                break
+        if selected_release is None:
+            raise CatalogError(
+                f"configured release-asset repository has no stable release containing *{RELEASE_ASSET_SUFFIX}: {full_name}"
+            )
+
+        tag = selected_release.get("tag_name")
+        if not isinstance(tag, str) or not tag:
+            raise CatalogError(f"selected GitHub release has no tag for {full_name}")
+
+        for asset in selected_assets:
+            asset_name = asset.get("name")
+            download_url = asset.get("browser_download_url")
+            if not isinstance(asset_name, str) or not isinstance(download_url, str):
+                raise CatalogError(f"matching release asset metadata is incomplete for {full_name}")
+            archive_bytes = client.fetch_bytes_url(download_url)
+            manifest, files, payloads = inspect_release_asset(
+                archive_bytes,
+                full_name,
+                asset_name,
+            )
+            plugin_id = manifest["name"]
+            version = normalize_version(manifest["version"])
+            assert version is not None
+            if plugin_id in seen_ids:
+                raise CatalogError(
+                    f"duplicate plugin id {plugin_id!r} across configured release assets"
+                )
+            seen_ids.add(plugin_id)
+
+            mirror_plugin_payload(mirror_root, plugin_id, version, payloads)
+            mirror_rel = f"{RELEASE_ASSET_MIRROR_DIR}/{plugin_id}/{version}/"
+            title = manifest.get("title")
+            description = manifest.get("description")
+            author = manifest.get("author")
+            plugins.append(
+                {
+                    "name": plugin_id,
+                    "title": title if isinstance(title, str) and title else plugin_id,
+                    "description": (
+                        description
+                        if isinstance(description, str)
+                        else (repo.get("description") or "")
+                    ),
+                    "author": (
+                        author
+                        if isinstance(author, str)
+                        else repo.get("owner", {}).get("login", "")
+                    ),
+                    "version": version,
+                    "repository": full_name,
+                    "release": tag,
+                    "release_url": selected_release.get("html_url", ""),
+                    "release_asset": asset_name,
+                    "published_at": selected_release.get("published_at", ""),
+                    "base": (
+                        f"https://raw.githubusercontent.com/{catalog_repository}/main/"
+                        f"{urllib.parse.quote(mirror_rel, safe='/')}"
+                    ),
+                    "files": files,
+                }
+            )
+
+    plugins.sort(key=lambda item: (item["title"].casefold(), item["name"]))
+    return plugins
+
+
 def merge_plugins(
     release_plugins: list[dict[str, Any]],
     curated_plugins: list[dict[str, Any]],
+    asset_plugins: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     merged = {plugin["name"]: plugin for plugin in curated_plugins}
     for plugin in release_plugins:
+        merged[plugin["name"]] = plugin
+    for plugin in asset_plugins or []:
         merged[plugin["name"]] = plugin
     return sorted(merged.values(), key=lambda item: (item["title"].casefold(), item["name"]))
 
@@ -339,7 +690,7 @@ def build_entry(
 
     version = normalize_version(tag)
     if version is None:
-        print(f"skip {full_name}: release tag {tag!r} is not a 2-4 part numeric version", file=sys.stderr)
+        print(f"skip {full_name}: release tag {tag!r} is not a three-part numeric version", file=sys.stderr)
         return None
 
     root = client.root_contents(full_name, tag)
@@ -487,6 +838,11 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("GITHUB_REPOSITORY", "jadehawk/PluginHub.crosspoint-plugin"),
         help="repository to exclude from its own catalog",
     )
+    parser.add_argument(
+        "--catalog-repository",
+        default=os.environ.get("GITHUB_REPOSITORY", "jadehawk/PluginHub.crosspoint-plugin"),
+        help="owner/repository used for generated release-asset mirror URLs",
+    )
     parser.add_argument("--max-repositories", type=int, default=None, help="optional accepted-plugin limit for testing")
     return parser.parse_args()
 
@@ -503,8 +859,14 @@ def main() -> int:
             args.max_repositories,
             whitelist.get("repositories", []),
         )
+        asset_plugins = release_asset_plugins(
+            client,
+            whitelist.get("release_asset_repositories", []),
+            args.catalog_repository,
+            Path(RELEASE_ASSET_MIRROR_DIR),
+        )
         curated_plugins = curated_catalog_plugins(client, whitelist)
-        plugins = merge_plugins(release_plugins, curated_plugins)
+        plugins = merge_plugins(release_plugins, curated_plugins, asset_plugins)
     except CatalogError as exc:
         print(f"catalog build failed: {exc}", file=sys.stderr)
         return 1
@@ -513,7 +875,7 @@ def main() -> int:
     print(
         f"catalog {'updated' if changed else 'unchanged'}: "
         f"{len(plugins)} plugins ({len(release_plugins)} release-discovered, "
-        f"{len(curated_plugins)} curated)"
+        f"{len(asset_plugins)} release-asset, {len(curated_plugins)} curated)"
     )
     return 0
 

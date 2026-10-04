@@ -13,7 +13,8 @@ Actions does the heavier discovery work off-device.
 2. Plugin Hub discovers candidate repositories on GitHub and also reads explicitly
    curated sources from `whitelist.json`.
 3. The catalog builder validates versions and install files.
-4. `catalog.json` is generated with immutable release-tag or commit-SHA URLs.
+4. `catalog.json` is generated from immutable release tags, commit SHAs, or
+   versioned mirrored release-asset payloads.
 5. Plugin Hub's `device.json` presents that catalog using CrossPoint's built-in
    plugin catalog UI.
 6. CrossPoint installs each selected bundle under
@@ -132,6 +133,38 @@ If your plugin also exposes a version in `device.json` or another metadata file,
 keep it synchronized with `manifest.json`. The installed plugin version used by
 CrossPoint is expected to remain consistent with the published catalog version.
 
+### Release-asset monorepos
+
+Some projects ship several targets from one repository instead of keeping the
+CrossPoint plugin at the repository root. Those repositories can be listed under
+`whitelist.json -> release_asset_repositories` using only their GitHub
+`owner/repository` name, for example `readest/readest`.
+
+For these repositories, every catalog refresh scans stable GitHub Releases from
+newest to oldest and selects the newest stable Release that contains one or more
+assets ending in `.crosspoint-plugin.zip`. Every matching ZIP in that Release is
+processed, so one monorepo Release can publish multiple CrossPoint plugins.
+
+Each ZIP must contain exactly one CrossPoint plugin root, either directly at the
+ZIP root or inside a directory. Its `manifest.json` must declare a three-part
+`version`, and its declared runtime files must be safe and present. A valid
+manifest `name` is used when present; otherwise a safe enclosing plugin directory
+name, such as Readest's `readest/`, becomes the plugin ID. The plugin manifest
+version is the version source of truth; it does not have to match the parent
+monorepo Release tag.
+
+Validated runtime files are mirrored into this repository under
+`release-assets/<plugin-id>/<version>/`, then published through the same normal
+`base` plus `files` catalog contract used by all other plugins. No CrossPoint
+firmware or Plugin Hub installer change is required. A mirrored plugin version is
+treated as immutable: if the same plugin/version later contains different bytes,
+the refresh fails and the upstream plugin must publish a new manifest version.
+
+If a newer stable monorepo Release has no CrossPoint asset yet, Plugin Hub keeps
+using the newest earlier stable Release that does. If a configured repository has
+no stable Release containing a matching asset, the refresh fails rather than
+silently dropping a previously published plugin.
+
 ### Curated catalog imports
 
 `whitelist.json` also supports importing selected plugin IDs from an existing
@@ -175,6 +208,9 @@ layout.
   "repositories": [
     "owner/repository"
   ],
+  "release_asset_repositories": [
+    "readest/readest"
+  ],
   "catalogs": [
     {
       "url": "https://example.com/catalog.json",
@@ -188,6 +224,11 @@ layout.
 
 A repository listed in `repositories` still has to pass the same stable Release
 and version checks as automatic discovery.
+
+A repository listed in `release_asset_repositories` needs no per-plugin path,
+asset filename, version, or pattern in the whitelist. Plugin Hub automatically
+selects `*.crosspoint-plugin.zip` assets and reads plugin identity/version from
+each ZIP's manifest.
 
 A catalog listed in `catalogs` contributes **only** the plugin IDs explicitly
 listed under `plugins`; Plugin Hub never imports every entry from a remote
@@ -209,6 +250,16 @@ URL, but GitHub Raw branch URLs are resolved to the branch's current 40-characte
 commit SHA before Plugin Hub publishes them. This keeps each generated catalog
 entry tied to one immutable source snapshot.
 
+Release-asset monorepo entries use generated versioned directories such as:
+
+```text
+https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/release-assets/readest/0.12.10/
+```
+
+The URL contains `main`, but each `<plugin-id>/<version>/` mirror is enforced as
+immutable by the catalog builder. A refresh aborts instead of changing an
+already-mirrored version in place.
+
 ## Catalog refresh
 
 The `Refresh Plugin Catalog` workflow runs every three hours and can also be run
@@ -217,14 +268,17 @@ manually. It:
 1. syncs to the current `main` branch;
 2. runs the catalog builder test suite;
 3. searches GitHub using the automatic discovery rules;
-4. loads `whitelist.json` and imports only explicitly curated repositories and
+4. loads `whitelist.json`, including manually configured release-asset monorepos and
    catalog plugin IDs;
-5. validates release-driven entries and pins mutable GitHub Raw bases from curated
+5. scans configured monorepo Releases for `*.crosspoint-plugin.zip`, validates
+   every matching plugin ZIP, and mirrors runtime files into `release-assets/`;
+6. validates release-driven entries and pins mutable GitHub Raw bases from curated
    catalogs to commit SHAs;
-6. merges the sources, with release-discovered plugin IDs taking precedence over
-   curated duplicates;
-7. rebuilds `catalog.json`;
-8. commits the catalog only when its plugin contents changed.
+7. merges the sources, with release-asset plugins taking precedence over standalone
+   release-discovered plugins and curated duplicates;
+8. rebuilds `catalog.json`;
+9. commits `catalog.json` and any new release-asset mirror files only when staged
+   contents changed.
 
 The generated timestamp is preserved when the catalog contents are unchanged, so
 scheduled runs do not create timestamp-only commits.

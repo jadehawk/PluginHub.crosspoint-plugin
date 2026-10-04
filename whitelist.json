@@ -1,5 +1,8 @@
 {
   "repositories": [],
+  "release_asset_repositories": [
+    "readest/readest"
+  ],
   "catalogs": [
     {
       "url": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
