@@ -1,7 +1,9 @@
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -22,6 +24,52 @@ class FakeClient:
 
     def json_file(self, full_name, ref, path):
         return self.manifest
+
+
+class ReleaseAssetClient:
+    def __init__(self, releases, payloads):
+        self.releases = releases
+        self.payloads = payloads
+
+    def repository(self, full_name):
+        owner, repo = full_name.split("/", 1)
+        return {
+            "full_name": full_name,
+            "name": repo,
+            "description": "Repository fallback description",
+            "owner": {"login": owner},
+        }
+
+    def stable_releases(self, full_name):
+        return self.releases
+
+    def fetch_bytes_url(self, url):
+        return self.payloads[url]
+
+
+def plugin_zip(manifest, prefix="", missing=(), extras=None):
+    files = manifest.get(
+        "files",
+        ["manifest.json", "device.json", "plugin.js", "README.md"],
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for relative_path in files:
+            if relative_path in missing:
+                continue
+            archive_path = f"{prefix}{relative_path}"
+            if relative_path == "manifest.json":
+                payload = json.dumps(manifest).encode("utf-8")
+            elif relative_path.endswith(".json"):
+                payload = b"{}\n"
+            elif relative_path.endswith(".js"):
+                payload = b"module.exports = {};\n"
+            else:
+                payload = f"fixture for {relative_path}\n".encode("utf-8")
+            archive.writestr(archive_path, payload)
+        for path, payload in (extras or {}).items():
+            archive.writestr(path, payload)
+    return buffer.getvalue()
 
 
 class CatalogBuilderTests(unittest.TestCase):
@@ -263,6 +311,188 @@ class CatalogBuilderTests(unittest.TestCase):
 
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["version"], "0.1.2.2")
+
+    def test_release_asset_plugin_wins_over_other_duplicate_sources(self):
+        curated = [{"name": "readest", "title": "Readest", "version": "0.1.0"}]
+        release = [{"name": "readest", "title": "Readest", "version": "0.2.0"}]
+        asset = [{"name": "readest", "title": "Readest", "version": "0.3.0"}]
+
+        merged = build_catalog.merge_plugins(release, curated, asset)
+
+        self.assertEqual(merged[0]["version"], "0.3.0")
+
+    def test_load_whitelist_accepts_manual_release_asset_repository_names(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "whitelist.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "repositories": [],
+                        "release_asset_repositories": ["readest/readest"],
+                        "catalogs": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            whitelist = build_catalog.load_whitelist(path)
+
+        self.assertEqual(
+            whitelist["release_asset_repositories"],
+            ["readest/readest"],
+        )
+
+    def test_release_asset_repository_uses_latest_stable_release_with_matching_zip(self):
+        manifest = {
+            "title": "Readest",
+            "description": "Readest for CrossPoint.",
+            "author": "Readest",
+            "version": "0.12.10",
+            "files": ["manifest.json", "device.json", "plugin.js", "README.md"],
+        }
+        payload = plugin_zip(manifest, prefix="readest/")
+        releases = [
+            {
+                "tag_name": "v0.13.0",
+                "assets": [{"name": "Readest-0.13.0-windows.zip"}],
+            },
+            {
+                "tag_name": "v0.12.10",
+                "html_url": "https://github.com/readest/readest/releases/tag/v0.12.10",
+                "published_at": "2026-09-21T00:00:00Z",
+                "assets": [
+                    {
+                        "name": "Readest-0.12.10.crosspoint-plugin.zip",
+                        "browser_download_url": "memory://readest",
+                    }
+                ],
+            },
+        ]
+        client = ReleaseAssetClient(releases, {"memory://readest": payload})
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            mirror_root = Path(temp_dir) / "release-assets"
+            plugins = build_catalog.release_asset_plugins(
+                client,
+                ["readest/readest"],
+                "jadehawk/PluginHub.crosspoint-plugin",
+                mirror_root,
+            )
+            mirrored_manifest = mirror_root / "readest" / "0.12.10" / "manifest.json"
+            self.assertTrue(mirrored_manifest.exists())
+            self.assertEqual(json.loads(mirrored_manifest.read_text())["version"], "0.12.10")
+
+        self.assertEqual(len(plugins), 1)
+        self.assertEqual(plugins[0]["name"], "readest")
+        self.assertEqual(plugins[0]["version"], "0.12.10")
+        self.assertEqual(plugins[0]["release"], "v0.12.10")
+        self.assertEqual(
+            plugins[0]["release_asset"],
+            "Readest-0.12.10.crosspoint-plugin.zip",
+        )
+        self.assertEqual(
+            plugins[0]["base"],
+            "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/release-assets/readest/0.12.10/",
+        )
+
+    def test_release_asset_repository_processes_multiple_matching_zips(self):
+        first_manifest = {
+            "name": "first-plugin",
+            "version": "1.0.0",
+            "files": ["manifest.json", "device.json"],
+        }
+        second_manifest = {
+            "name": "second-plugin",
+            "version": "2.0.0",
+            "files": ["manifest.json", "plugin.js"],
+        }
+        releases = [
+            {
+                "tag_name": "v9.9.9",
+                "assets": [
+                    {
+                        "name": "First.crosspoint-plugin.zip",
+                        "browser_download_url": "memory://first",
+                    },
+                    {
+                        "name": "Second.crosspoint-plugin.zip",
+                        "browser_download_url": "memory://second",
+                    },
+                ],
+            }
+        ]
+        client = ReleaseAssetClient(
+            releases,
+            {
+                "memory://first": plugin_zip(first_manifest),
+                "memory://second": plugin_zip(second_manifest),
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugins = build_catalog.release_asset_plugins(
+                client,
+                ["owner/monorepo"],
+                "jadehawk/PluginHub.crosspoint-plugin",
+                Path(temp_dir) / "release-assets",
+            )
+
+        self.assertEqual([plugin["name"] for plugin in plugins], ["first-plugin", "second-plugin"])
+        self.assertEqual([plugin["version"] for plugin in plugins], ["1.0.0", "2.0.0"])
+        self.assertTrue(all(plugin["release"] == "v9.9.9" for plugin in plugins))
+
+    def test_release_asset_rejects_unsafe_archive_paths(self):
+        manifest = {
+            "name": "unsafe",
+            "version": "1.0.0",
+            "files": ["manifest.json", "device.json"],
+        }
+        payload = plugin_zip(manifest, extras={"../secret.txt": b"nope"})
+
+        with self.assertRaises(build_catalog.CatalogError):
+            build_catalog.inspect_release_asset(payload, "owner/repo", "unsafe.crosspoint-plugin.zip")
+
+    def test_release_asset_rejects_missing_declared_files(self):
+        manifest = {
+            "name": "broken",
+            "version": "1.0.0",
+            "files": ["manifest.json", "device.json", "assets/icon.bin"],
+        }
+        payload = plugin_zip(manifest, missing={"assets/icon.bin"})
+
+        with self.assertRaises(build_catalog.CatalogError):
+            build_catalog.inspect_release_asset(payload, "owner/repo", "broken.crosspoint-plugin.zip")
+
+    def test_mirror_rejects_same_version_payload_mutation(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir) / "release-assets"
+            build_catalog.mirror_plugin_payload(
+                root,
+                "example",
+                "1.0.0",
+                {"manifest.json": b"one", "device.json": b"{}"},
+            )
+            with self.assertRaises(build_catalog.CatalogError):
+                build_catalog.mirror_plugin_payload(
+                    root,
+                    "example",
+                    "1.0.0",
+                    {"manifest.json": b"two", "device.json": b"{}"},
+                )
+
+    def test_configured_release_asset_repository_without_matching_zip_fails(self):
+        client = ReleaseAssetClient(
+            [{"tag_name": "v1.0.0", "assets": [{"name": "desktop.zip"}]}],
+            {},
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with self.assertRaises(build_catalog.CatalogError):
+                build_catalog.release_asset_plugins(
+                    client,
+                    ["owner/monorepo"],
+                    "jadehawk/PluginHub.crosspoint-plugin",
+                    Path(temp_dir) / "release-assets",
+                )
 
     def test_rate_limit_aborts_catalog_build_instead_of_publishing_partial_results(self):
         class RateLimitedClient:

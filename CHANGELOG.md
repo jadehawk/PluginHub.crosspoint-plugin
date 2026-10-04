@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add `release_asset_repositories` support for monorepos that publish one or more `*.crosspoint-plugin.zip` assets from stable GitHub Releases.
+- Validate release ZIPs safely, mirror declared runtime files under immutable per-plugin/version directories, and publish them through the normal Plugin Hub `base` plus `files` contract.
+- Configure `readest/readest` as the first release-asset repository and process every matching CrossPoint plugin ZIP from its newest stable Release that contains one.
+
 ## 0.1.4
 
 - Adopt the newer firmware `api.dir` plugin-directory API when available without requiring it on older firmware.
