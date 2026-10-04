@@ -7,11 +7,91 @@ maintain the community catalog.
 The reader only consumes this repository's generated `catalog.json`. GitHub
 Actions does the heavier discovery work off-device.
 
+## Get your plugin into Plugin Hub
+
+> [!IMPORTANT]
+> **If your CrossPoint plugin is at the repository root and follows the automatic-
+> discovery layout below, you do not need to open a Plugin Hub pull request.** Add
+> the `crosspoint-plugin` GitHub topic, publish a stable GitHub Release, and Plugin
+> Hub will discover it automatically.
+>
+> We strongly prefer developers to structure new plugins for this automatic path
+> instead of asking for manual allowlisting. This is a project convention rather
+> than a formal CrossPoint requirement, modeled after the predictable standalone
+> plugin layout used by the KOReader plugin ecosystem.
+
+Choose the path that matches how your plugin is published:
+
+| Plugin layout | Catalog path | Pull request required? |
+| --- | --- | --- |
+| CrossPoint plugin is at the repository root and follows the layout below | **Automatic discovery — RECOMMENDED** | **NO** |
+| CrossPoint plugin is inside a monorepo and published as `*.crosspoint-plugin.zip` Release assets | Release-asset monorepo | **YES** |
+| Plugin must be imported from another catalog | Curated/legacy catalog import | **YES** |
+| Standalone plugin cannot reasonably use automatic discovery and needs an exception | Manual `repositories` entry | **YES — exception only** |
+
+### Recommended: standalone plugin repository — NO PR
+
+This is the preferred way to publish a new CrossPoint plugin. Think of it as the
+Plugin Hub repository convention: **one plugin, one repository, plugin files at the
+repository root, predictable metadata, and versioned GitHub Releases**. We adopted
+this style from the practical conventions used by the KOReader plugin ecosystem.
+
+If a new plugin can be structured this way, please do that instead of requesting a
+manual whitelist exception. You do **not** need to open a Plugin Hub pull request,
+edit `whitelist.json`, file an issue, or ask to be manually added.
+
+1. Host the plugin in a **public GitHub repository**.
+2. Put the CrossPoint plugin files at the **repository root**.
+3. Add the GitHub repository topic **`crosspoint-plugin`**.
+4. Include a root-level `manifest.json` and at least one runnable entry point:
+   `device.json` or `plugin.js`.
+5. Use a three-part numeric version such as `1.2.0` in `manifest.json`.
+6. Publish a **non-draft, non-prerelease GitHub Release** whose tag matches that
+   manifest version, for example `v1.2.0`.
+7. Wait for the next Plugin Hub catalog refresh. It runs every three hours and can
+   also be run manually by a maintainer.
+
+**That is all. If the plugin follows this convention, no Plugin Hub PR is needed.**
+
+### Monorepo / release-asset plugin — PR required
+
+Use this when the CrossPoint plugin is not at the repository root and the project
+publishes it as a GitHub Release asset ending in `.crosspoint-plugin.zip`.
+
+1. Publish one or more `*.crosspoint-plugin.zip` assets on a stable GitHub Release.
+2. Each ZIP must contain exactly one CrossPoint plugin root with `manifest.json`
+   and `device.json` or `plugin.js`.
+3. Open a **pull request to this Plugin Hub repository** adding only the GitHub
+   `owner/repository` name to `whitelist.json -> release_asset_repositories`.
+4. After that PR is merged, Plugin Hub automatically finds the newest stable
+   Release containing matching assets, validates every matching ZIP, and publishes
+   each valid plugin.
+
+You do **not** configure a path, ZIP filename, asset pattern, or version in the
+whitelist. Those are discovered from the Release assets themselves.
+
+### Curated / legacy catalog import — PR required
+
+Use this only when a plugin cannot yet use the recommended standalone layout or
+the release-asset monorepo layout and must instead be imported from an existing
+catalog.
+
+Open a **pull request to this Plugin Hub repository** updating
+`whitelist.json -> catalogs` with the upstream catalog URL and the specific plugin
+ID or IDs to import. Plugin Hub never imports an entire external catalog implicitly.
+
+Manual additions to `whitelist.json -> repositories` also require a pull request,
+but they are intended as an exception rather than an alternate onboarding path. If
+a standalone plugin can be reformatted to follow the recommended repository
+convention and automatic-discovery rules, that should be preferred over adding a
+manual allowlist entry.
+
 ## How it works
 
-1. Plugin authors publish a normal CrossPoint plugin repository.
-2. Plugin Hub discovers candidate repositories on GitHub and also reads explicitly
-   curated sources from `whitelist.json`.
+1. Plugin authors publish either a standalone CrossPoint plugin repository or a
+   supported release-asset package.
+2. Plugin Hub discovers standalone candidates on GitHub and also reads explicitly
+   configured sources from `whitelist.json`.
 3. The catalog builder validates versions and install files.
 4. `catalog.json` is generated from immutable release tags, commit SHAs, or
    versioned mirrored release-asset payloads.
@@ -25,10 +105,9 @@ on-reader catalog, while `plugin.js` provides the browser-side management UI.
 Installation and updating still use CrossPoint's existing declarative bundle
 installer.
 
-## Get your plugin listed
+## Detailed requirements for the recommended no-PR path
 
-For a new standalone CrossPoint plugin, **automatic discovery is the recommended
-path and does not require a Plugin Hub pull request**.
+The checklist below expands on the standalone automatic-discovery path above.
 
 To make your plugin eligible for Plugin Hub:
 
@@ -136,9 +215,9 @@ CrossPoint is expected to remain consistent with the published catalog version.
 ### Release-asset monorepos
 
 Some projects ship several targets from one repository instead of keeping the
-CrossPoint plugin at the repository root. Those repositories can be listed under
-`whitelist.json -> release_asset_repositories` using only their GitHub
-`owner/repository` name, for example `readest/readest`.
+CrossPoint plugin at the repository root. **This path requires a pull request to
+Plugin Hub.** The PR adds the GitHub `owner/repository` name, for example
+`readest/readest`, under `whitelist.json -> release_asset_repositories`.
 
 For these repositories, every catalog refresh scans stable GitHub Releases from
 newest to oldest and selects the newest stable Release that contains one or more
@@ -168,8 +247,9 @@ silently dropping a previously published plugin.
 ### Curated catalog imports
 
 `whitelist.json` also supports importing selected plugin IDs from an existing
-catalog. This exists primarily for current/legacy CrossPoint plugins that are not
-yet packaged as standalone release-driven repositories.
+catalog. **This path requires a pull request to Plugin Hub.** It exists primarily
+for current/legacy CrossPoint plugins that are not yet packaged as standalone
+release-driven repositories or release-asset monorepos.
 
 For these entries:
 
@@ -181,8 +261,9 @@ For these entries:
 - If the upstream `base` points to a GitHub Raw branch such as `main`, Plugin
   Hub resolves that branch to its current 40-character commit SHA so the files in
   the generated catalog are an immutable snapshot.
-- Release-discovered plugins take precedence if the same plugin ID also appears in
-  a curated catalog import.
+- Source precedence is **curated catalog < standalone release-discovered <
+  release-asset monorepo**. If the same plugin ID appears in more than one source,
+  the higher-precedence source wins.
 
 **Changing files in an upstream branch without bumping the upstream catalog
 version will not produce a usable version update for installed users.** The
@@ -227,15 +308,17 @@ and version checks as automatic discovery.
 
 A repository listed in `release_asset_repositories` needs no per-plugin path,
 asset filename, version, or pattern in the whitelist. Plugin Hub automatically
-selects `*.crosspoint-plugin.zip` assets and reads plugin identity/version from
-each ZIP's manifest.
+selects `*.crosspoint-plugin.zip` assets. The plugin version comes from each ZIP's
+manifest; the plugin ID comes from a valid manifest `name` when present or falls
+back to the safe enclosing plugin directory name.
 
 A catalog listed in `catalogs` contributes **only** the plugin IDs explicitly
 listed under `plugins`; Plugin Hub never imports every entry from a remote
 catalog implicitly.
 
-Adding or removing curated entries requires a change to this repository's
-`whitelist.json`.
+Any addition or removal under `repositories`, `release_asset_repositories`, or
+`catalogs` changes this repository's `whitelist.json` and therefore requires a
+Plugin Hub pull request. The recommended automatic-discovery path does not.
 
 ## Immutable sources
 
@@ -287,9 +370,10 @@ Separately, the `Promote Stable Plugin Hub Release` workflow moves the `stable`
 branch to the exact commit behind each newly published non-prerelease Release.
 It can also be run manually from GitHub Actions. A manually supplied stable tag is
 validated before promotion; leaving the tag blank promotes the latest published
-stable Release. That moving branch is used only as a bootstrap/install pointer;
-released plugin artifacts and generated community catalog entries remain pinned to
-immutable tags or commit SHAs.
+stable Release. That moving branch is used only as a bootstrap/install pointer.
+Standalone release-discovered entries remain pinned to immutable Release tags,
+curated GitHub Raw entries are pinned to commit SHAs, and release-asset entries use
+versioned mirrors that the catalog builder enforces as immutable.
 
 ## Local validation
 
