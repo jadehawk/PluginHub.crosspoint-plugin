@@ -14,7 +14,7 @@
         "url": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/community-catalog.json",
         "notice": {
           "title": "Community Plugins",
-          "message": "Third-party plugins. Not vetted by CrossPoint.",
+          "message": "Third-party plugins. Not vetted by Dev Team.",
           "confirm": "Continue",
           "cancel": "Go Back"
         }
