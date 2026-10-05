@@ -11,7 +11,13 @@
       },
       {
         "title": "Community Plugins",
-        "url": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/community-catalog.json"
+        "url": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/community-catalog.json",
+        "notice": {
+          "title": "Community Plugins",
+          "message": "Community plugins are third-party and not vetted by the CrossPoint team. Install at your own discretion.",
+          "confirm": "Continue",
+          "cancel": "Go Back"
+        }
       }
     ],
     "items": "plugins",
