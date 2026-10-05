@@ -8,7 +8,7 @@ from pathlib import Path
 from catalog_partitions import COMMUNITY_NOTICE, compact_json, partition_community_plugins, shard_filename
 
 REPOSITORY = "jadehawk/PluginHub.crosspoint-plugin"
-BRANCH = "community-catalog-partitioning"
+BRANCH = "main"
 COUNTS = (2000, 4000, 6000)
 
 
@@ -66,9 +66,9 @@ def main() -> int:
         "generated_at": generated_at,
         "lists": entries,
     }
-    index_path = root / "catalog-lists.json"
+    index_path = stress_root / "catalog-lists.json"
     index_path.write_text(compact_json(index_payload), encoding="utf-8")
-    print(f"catalog-lists.json: {len(entries)} lists, {index_path.stat().st_size} bytes")
+    print(f"stress/catalog-lists.json: {len(entries)} lists, {index_path.stat().st_size} bytes")
     return 0
 
 

@@ -10,9 +10,21 @@ plugins discovered from community developers. GitHub Actions does the heavier
 discovery and classification work off-device.
 
 For backward compatibility, `catalog.json` remains a generated union of both
-catalogs. New Plugin Hub interfaces use `official-catalog.json` and
-`community-catalog.json` directly and do not expose the compatibility union as a
-third browsing choice.
+catalogs. New Plugin Hub interfaces use a generated `catalog-lists.json` index so
+Community can remain one catalog while small, or automatically become multiple
+alphabetical shards when its compact serialized size approaches the firmware limit.
+The compatibility union is not exposed as a third browsing choice.
+
+> [!NOTE]
+> **0.1.6 is intentionally staged on `main` but not yet released.** Production
+> `stable` and the latest stable GitHub Release remain 0.1.5 until the supporting
+> CrossPoint firmware changes for `browse.lists_url` and per-list notices are
+> merged/released. This keeps existing plugin-enabled firmware on the compatible
+> 0.1.5 release while 0.1.6 remains ready for the firmware rollout.
+
+For maintainer details on whitelist/blacklist behavior, dynamic catalog generation,
+firmware requirements, and the 2K/4K/6K torture test, see
+[`PLUGIN_HUB_CATALOG_AND_FIRMWARE_REFERENCE.md`](PLUGIN_HUB_CATALOG_AND_FIRMWARE_REFERENCE.md).
 
 ## Get your plugin into Plugin Hub
 
@@ -101,17 +113,22 @@ manual allowlist entry.
    supported release-asset package.
 2. Plugin Hub discovers standalone candidates on GitHub and also reads explicitly
    configured sources from `whitelist.json`.
-3. The catalog builder validates versions and install files, then applies
+3. `blacklist.json` removes repositories that must never be published, regardless
+   of discovery, whitelist, release-asset, curated-catalog, or Official status.
+4. The catalog builder validates versions and install files, then applies
    `catalog-policy.json`.
-4. IDs explicitly listed in the policy are published in **Official Plugins** only
+5. IDs explicitly listed in the policy are published in **Official Plugins** only
    when they resolve to their declared trusted source. All other valid discovered
    plugins are published in **Community Plugins**.
-5. The builder writes `official-catalog.json`, `community-catalog.json`, and the
-   backward-compatible union `catalog.json` from immutable release tags, commit
-   SHAs, or versioned mirrored release-asset payloads.
-6. Plugin Hub's `device.json` presents Official and Community as separate built-in
-   lists using CrossPoint's existing catalog-list UI.
-7. CrossPoint installs each selected bundle under
+6. The builder writes compact machine JSON. Community stays in one file while it
+   fits under the native response limit, then automatically splits into the minimum
+   number of balanced contiguous alphabetical shards that fit.
+7. The builder writes `catalog-lists.json`, which points at Official plus whatever
+   Community shard layout currently exists and attaches the third-party warning to
+   every Community entry.
+8. Plugin Hub's `device.json` uses `browse.lists_url` to load that live index, so
+   shard-count changes do not require a Plugin Hub release.
+9. CrossPoint installs each selected bundle under
    `/.crosspoint/plugins/<plugin-id>/`.
 
 Plugin Hub uses both CrossPoint plugin surfaces: `device.json` provides the
