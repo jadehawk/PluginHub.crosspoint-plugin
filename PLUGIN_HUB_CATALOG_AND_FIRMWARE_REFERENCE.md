@@ -200,7 +200,7 @@ This is generic firmware functionality, not hard-coded Plugin Hub UI, so other p
 
 ## CrossPoint firmware enhancements used by Plugin Hub 0.1.6
 
-The firmware feature work is in the CrossPoint firmware branch/worktree `feat/install-plugin-hub-settings`. The original native **Install Plugin Hub** change is committed there as `d8ba9499` and was physically validated on X3, X4, X4Pro, and Seeed reTerminal Sticky. The later `lists_url` / notice extensions are part of the same firmware feature effort. Plugin Hub 0.1.6 must wait until the relevant firmware changes are merged/released.
+The full firmware feature work is committed and pushed on `feat/install-plugin-hub-settings` as `e88581e7` (`feat: add dynamic plugin catalog lists and notices`), on top of the original installer commit `d8ba9499`. The native **Install Plugin Hub** change was physically validated on X3, X4, X4Pro, and Seeed reTerminal Sticky, and the later dynamic-list / notice extensions were tested with the 2K/4K/6K catalog torture scenarios described below. Plugin Hub 0.1.6 must wait until these firmware changes are merged/released.
 
 ### 1. Settings -> Install Plugin Hub
 
