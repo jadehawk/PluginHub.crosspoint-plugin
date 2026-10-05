@@ -1,9 +1,25 @@
 {
   "title": "Plugin Hub",
-  "description": "Discover, install, and update CrossPoint community plugins.",
+  "description": "Discover, install, and update CrossPoint plugins.",
   "browse": {
     "format": "json",
     "url": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog.json",
+    "lists": [
+      {
+        "title": "Official Plugins",
+        "url": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/official-catalog.json"
+      },
+      {
+        "title": "Community Plugins",
+        "url": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/community-catalog.json",
+        "notice": {
+          "title": "Community Plugins",
+          "message": "Third-party plugins. Not vetted by Dev Team.",
+          "confirm": "Continue",
+          "cancel": "Go Back"
+        }
+      }
+    ],
     "items": "plugins",
     "page_size": 16,
     "fields": {

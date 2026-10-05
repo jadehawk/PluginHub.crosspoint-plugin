@@ -9,24 +9,45 @@ CrossPoint.registerPlugin(async (container, api) => {
   const CONFIG_PATH = PLUGIN_DIR ? PLUGIN_DIR + '/config.json' : LEGACY_CONFIG_PATH;
   const PLUGINS_DIR = '/.crosspoint/plugins';
   const RELEASE_API_URL = 'https://api.github.com/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest';
-  const DEFAULT_CATALOG =
+  const LEGACY_CATALOG =
     'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog.json';
+  const OFFICIAL_CATALOG =
+    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/official-catalog.json';
+  const COMMUNITY_CATALOG =
+    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/community-catalog.json';
+  const BUILT_IN_CATALOGS = [
+    {
+      title: 'Official Plugins',
+      description: 'Curated and recognized for the CrossPoint ecosystem.',
+      url: OFFICIAL_CATALOG
+    },
+    {
+      title: 'Community Plugins',
+      description: 'Third-party plugins from CrossPoint community developers.',
+      url: COMMUNITY_CATALOG
+    }
+  ];
 
+  let selectedCatalog = OFFICIAL_CATALOG;
   let extraCatalogs = [];
 
   container.innerHTML =
     '<h2>Plugin Hub</h2>' +
     '<p id="ph-version" style="color:#666">Version: checking...</p>' +
-    '<h3 style="margin:0.5em 0 0.2em">Catalogs</h3>' +
+    '<h3 style="margin:0.5em 0 0.2em">Browse plugins</h3>' +
     '<div id="ph-catalogs"></div>' +
+    '<details style="margin-top:0.8em"><summary>Custom catalogs</summary>' +
+    '<div id="ph-custom-catalogs"></div>' +
     '<div class="setting-row">' +
     '<span class="setting-control"><input type="text" id="ph-new" placeholder="https://.../catalog.json" style="width:100%"></span>' +
     '<button type="button" class="btn-small btn-add" id="ph-add">Add catalog</button></div>' +
-    '<div class="setting-row"><button type="button" class="btn-small btn-add" id="ph-refresh">Save &amp; refresh</button></div>' +
+    '</details>' +
+    '<div class="setting-row"><button type="button" class="btn-small btn-add" id="ph-refresh">Refresh selected catalog</button></div>' +
     '<p id="ph-status"></p>' +
     '<div id="ph-list"></div>';
 
   const catalogsEl = document.getElementById('ph-catalogs');
+  const customCatalogsEl = document.getElementById('ph-custom-catalogs');
   const listEl = document.getElementById('ph-list');
   const status = (text) => {
     document.getElementById('ph-status').textContent = text;
@@ -56,16 +77,25 @@ CrossPoint.registerPlugin(async (container, api) => {
     return btoa(bin);
   }
 
-  function allCatalogs() {
-    const seen = new Set([DEFAULT_CATALOG]);
-    const urls = [DEFAULT_CATALOG];
-    for (const url of extraCatalogs) {
+  function isReservedCatalog(url) {
+    return url === LEGACY_CATALOG || url === OFFICIAL_CATALOG || url === COMMUNITY_CATALOG;
+  }
+
+  function normalizeExtraCatalogs(urls) {
+    const seen = new Set();
+    const normalized = [];
+    for (const url of urls || []) {
       const trimmed = String(url || '').trim();
-      if (!trimmed || seen.has(trimmed)) continue;
+      if (!trimmed || isReservedCatalog(trimmed) || seen.has(trimmed)) continue;
       seen.add(trimmed);
-      urls.push(trimmed);
+      normalized.push(trimmed);
     }
-    return urls;
+    return normalized;
+  }
+
+  function selectedCatalogLabel() {
+    const builtIn = BUILT_IN_CATALOGS.find((catalog) => catalog.url === selectedCatalog);
+    return builtIn ? builtIn.title : hostOf(selectedCatalog);
   }
 
   async function readJsonFile(path) {
@@ -90,6 +120,14 @@ CrossPoint.registerPlugin(async (container, api) => {
   }
 
   function saveConfig() {
+    extraCatalogs = normalizeExtraCatalogs(extraCatalogs);
+    if (
+      selectedCatalog !== OFFICIAL_CATALOG &&
+      selectedCatalog !== COMMUNITY_CATALOG &&
+      !extraCatalogs.includes(selectedCatalog)
+    ) {
+      selectedCatalog = OFFICIAL_CATALOG;
+    }
     return api.writeFile(
       CONFIG_PATH,
       b64(JSON.stringify({ extraCatalogs }, null, 2))
@@ -299,29 +337,33 @@ CrossPoint.registerPlugin(async (container, api) => {
 
   function renderCatalogs() {
     catalogsEl.innerHTML = '';
+    customCatalogsEl.innerHTML = '';
 
-    const primary = document.createElement('div');
-    primary.className = 'setting-row';
+    BUILT_IN_CATALOGS.forEach((catalog) => {
+      const row = document.createElement('div');
+      row.className = 'setting-row';
 
-    const primaryInput = document.createElement('input');
-    primaryInput.type = 'text';
-    primaryInput.value = DEFAULT_CATALOG;
-    primaryInput.style.width = '100%';
-    primaryInput.readOnly = true;
+      const meta = document.createElement('span');
+      meta.className = 'setting-name';
+      meta.innerHTML =
+        '<strong>' + escapeHtml(catalog.title) + '</strong>' +
+        '<br><span style="color:#666">' + escapeHtml(catalog.description) + '</span>';
 
-    const primaryControl = document.createElement('span');
-    primaryControl.className = 'setting-control';
-    primaryControl.appendChild(primaryInput);
+      const browse = document.createElement('button');
+      browse.type = 'button';
+      browse.className = 'btn-small btn-add';
+      browse.textContent = selectedCatalog === catalog.url ? 'Selected' : 'Browse';
+      browse.disabled = selectedCatalog === catalog.url;
+      browse.onclick = async () => {
+        selectedCatalog = catalog.url;
+        renderCatalogs();
+        await refresh();
+      };
 
-    const builtIn = document.createElement('button');
-    builtIn.type = 'button';
-    builtIn.className = 'btn-small';
-    builtIn.textContent = 'Built-in';
-    builtIn.disabled = true;
-
-    primary.appendChild(primaryControl);
-    primary.appendChild(builtIn);
-    catalogsEl.appendChild(primary);
+      row.appendChild(meta);
+      row.appendChild(browse);
+      catalogsEl.appendChild(row);
+    });
 
     extraCatalogs.forEach((url, index) => {
       const row = document.createElement('div');
@@ -332,35 +374,61 @@ CrossPoint.registerPlugin(async (container, api) => {
       input.value = url;
       input.style.width = '100%';
       input.oninput = () => {
-        extraCatalogs[index] = input.value.trim();
+        const previous = extraCatalogs[index];
+        const next = input.value.trim();
+        extraCatalogs[index] = next;
+        if (selectedCatalog === previous) selectedCatalog = next;
+      };
+
+      const controls = document.createElement('span');
+      controls.className = 'setting-control';
+
+      const browse = document.createElement('button');
+      browse.type = 'button';
+      browse.className = 'btn-small btn-add';
+      browse.textContent = selectedCatalog === url ? 'Selected' : 'Browse';
+      browse.disabled = selectedCatalog === url;
+      browse.onclick = async () => {
+        selectedCatalog = url;
+        renderCatalogs();
+        await refresh();
       };
 
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'btn-small';
       remove.textContent = 'Remove';
-      remove.onclick = () => {
+      remove.onclick = async () => {
+        const removed = extraCatalogs[index];
         extraCatalogs.splice(index, 1);
+        if (selectedCatalog === removed) selectedCatalog = OFFICIAL_CATALOG;
         renderCatalogs();
+        await saveConfig();
+        if (selectedCatalog === OFFICIAL_CATALOG) await refresh();
       };
 
-      const control = document.createElement('span');
-      control.className = 'setting-control';
-      control.appendChild(input);
+      const inputControl = document.createElement('span');
+      inputControl.className = 'setting-name';
+      inputControl.appendChild(input);
+      controls.appendChild(browse);
+      controls.appendChild(document.createTextNode(' '));
+      controls.appendChild(remove);
 
-      row.appendChild(control);
-      row.appendChild(remove);
-      catalogsEl.appendChild(row);
+      row.appendChild(inputControl);
+      row.appendChild(controls);
+      customCatalogsEl.appendChild(row);
     });
   }
 
-  document.getElementById('ph-add').onclick = () => {
+  document.getElementById('ph-add').onclick = async () => {
     const input = document.getElementById('ph-new');
     const url = input.value.trim();
-    if (!url || url === DEFAULT_CATALOG || extraCatalogs.includes(url)) return;
+    if (!url || isReservedCatalog(url) || extraCatalogs.includes(url)) return;
     extraCatalogs.push(url);
+    extraCatalogs = normalizeExtraCatalogs(extraCatalogs);
     input.value = '';
     renderCatalogs();
+    await saveConfig();
   };
 
   function pluginCard(plugin, installed) {
@@ -470,16 +538,19 @@ CrossPoint.registerPlugin(async (container, api) => {
 
   async function refresh() {
     await saveConfig();
+    renderCatalogs();
     listEl.innerHTML = '';
 
-    const urls = allCatalogs();
-    status(
-      'Loading ' +
-      urls.length +
-      ' catalog' +
-      (urls.length === 1 ? '' : 's') +
-      '…'
-    );
+    const url = selectedCatalog;
+    status('Loading ' + selectedCatalogLabel() + '…');
+
+    let catalog;
+    try {
+      catalog = JSON.parse(await relayText(url));
+    } catch (e) {
+      status('Error loading ' + selectedCatalogLabel() + ': ' + e.message);
+      return;
+    }
 
     const names = await installedNames();
     const installed = new Map();
@@ -487,47 +558,31 @@ CrossPoint.registerPlugin(async (container, api) => {
       installed.set(name, await installedVersion(name));
     }
 
-    let total = 0;
+    const catalogName = catalog.name || selectedCatalogLabel();
+    const plugins = Array.isArray(catalog.plugins) ? catalog.plugins : [];
     let updates = 0;
-    const errors = [];
 
-    for (const url of urls) {
-      let catalog;
-      try {
-        catalog = JSON.parse(await relayText(url));
-      } catch (e) {
-        errors.push(hostOf(url) + ': ' + e.message);
-        continue;
+    if (plugins.length) {
+      const header = document.createElement('h3');
+      header.textContent = catalogName;
+      header.style.margin = '0.8em 0 0.2em';
+      listEl.appendChild(header);
+    }
+
+    for (const plugin of plugins) {
+      if (
+        installed.has(plugin.name) &&
+        hasUpdate(installed.get(plugin.name), plugin.version)
+      ) {
+        updates += 1;
       }
-
-      const catalogName =
-        catalog.name ||
-        (url === DEFAULT_CATALOG ? 'Plugin Hub' : hostOf(url));
-      const plugins = Array.isArray(catalog.plugins) ? catalog.plugins : [];
-
-      if (plugins.length) {
-        const header = document.createElement('h3');
-        header.textContent = catalogName;
-        header.style.margin = '0.8em 0 0.2em';
-        listEl.appendChild(header);
-      }
-
-      for (const plugin of plugins) {
-        if (
-          installed.has(plugin.name) &&
-          hasUpdate(installed.get(plugin.name), plugin.version)
-        ) {
-          updates += 1;
-        }
-        listEl.appendChild(pluginCard(plugin, installed));
-        total += 1;
-      }
+      listEl.appendChild(pluginCard(plugin, installed));
     }
 
     let message =
-      total +
+      plugins.length +
       ' plugin' +
-      (total === 1 ? '' : 's') +
+      (plugins.length === 1 ? '' : 's') +
       ' available';
     if (updates) {
       message +=
@@ -536,33 +591,20 @@ CrossPoint.registerPlugin(async (container, api) => {
         ' update' +
         (updates === 1 ? '' : 's');
     }
-    message += '.';
-
-    if (errors.length) {
-      message +=
-        ' (' +
-        errors.length +
-        ' catalog' +
-        (errors.length === 1 ? '' : 's') +
-        ' failed: ' +
-        errors.join('; ') +
-        ')';
-    }
-
-    status(message);
+    status(message + '.');
   }
 
   document.getElementById('ph-refresh').onclick = refresh;
 
   const config = await loadConfig();
   if (Array.isArray(config.extraCatalogs)) {
-    extraCatalogs = config.extraCatalogs;
+    extraCatalogs = normalizeExtraCatalogs(config.extraCatalogs);
   } else if (Array.isArray(config.catalogs)) {
-    // Accept an early/legacy multi-catalog shape while keeping the Hub catalog
-    // built in and non-removable.
-    extraCatalogs = config.catalogs.filter((url) => url !== DEFAULT_CATALOG);
-  } else if (config.catalog && config.catalog !== DEFAULT_CATALOG) {
-    extraCatalogs = [config.catalog];
+    // Accept an early/legacy multi-catalog shape without surfacing any built-in
+    // or compatibility feed as a removable custom catalog.
+    extraCatalogs = normalizeExtraCatalogs(config.catalogs);
+  } else if (config.catalog) {
+    extraCatalogs = normalizeExtraCatalogs([config.catalog]);
   }
 
   renderCatalogs();

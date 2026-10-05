@@ -4,7 +4,7 @@
     {
       "name": "pluginhub",
       "title": "Plugin Hub",
-      "description": "Discover, install, and update CrossPoint community plugins.",
+      "description": "Browse and install CrossPoint plugins.",
       "author": "Jadehawk",
       "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/stable/",
       "files": [
