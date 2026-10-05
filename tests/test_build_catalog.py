@@ -291,35 +291,183 @@ class CatalogBuilderTests(unittest.TestCase):
         )
         self.assertEqual(plugins[0]["source_catalog"], "https://example.test/catalog.json")
 
-    def test_release_plugin_wins_over_curated_duplicate(self):
-        curated = [
-            {
-                "name": "send2ereader",
-                "title": "Send2Ereader",
-                "version": "0.1.0",
-            }
-        ]
-        release = [
-            {
-                "name": "send2ereader",
-                "title": "Send2Ereader",
-                "version": "0.1.2.2",
-            }
-        ]
+    def test_policy_requires_one_explicit_trusted_source_per_official_plugin(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "catalog-policy.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "official": [
+                            {
+                                "plugin": "bookfusion",
+                                "source_catalog": "https://example.test/catalog.json",
+                            },
+                            {
+                                "plugin": "webdav",
+                                "repository": "owner/webdav.crosspoint-plugin",
+                            },
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
 
-        merged = build_catalog.merge_plugins(release, curated)
+            policy = build_catalog.load_policy(path)
 
-        self.assertEqual(len(merged), 1)
-        self.assertEqual(merged[0]["version"], "0.1.2.2")
+        self.assertEqual(
+            policy["official"],
+            [
+                {
+                    "plugin": "bookfusion",
+                    "source_catalog": "https://example.test/catalog.json",
+                },
+                {
+                    "plugin": "webdav",
+                    "repository": "owner/webdav.crosspoint-plugin",
+                },
+            ],
+        )
 
-    def test_release_asset_plugin_wins_over_other_duplicate_sources(self):
-        curated = [{"name": "readest", "title": "Readest", "version": "0.1.0"}]
-        release = [{"name": "readest", "title": "Readest", "version": "0.2.0"}]
-        asset = [{"name": "readest", "title": "Readest", "version": "0.3.0"}]
+    def test_policy_rejects_duplicate_official_plugin_ids(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "catalog-policy.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "official": [
+                            {"plugin": "example", "repository": "owner/one"},
+                            {"plugin": "example", "repository": "owner/two"},
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
 
-        merged = build_catalog.merge_plugins(release, curated, asset)
+            with self.assertRaises(build_catalog.CatalogError):
+                build_catalog.load_policy(path)
 
-        self.assertEqual(merged[0]["version"], "0.3.0")
+    def test_official_trusted_source_wins_over_conflicting_candidate(self):
+        trusted = {
+            "name": "bookfusion",
+            "title": "BookFusion",
+            "version": "1.2.0",
+            "source_catalog": "https://trusted.test/catalog.json",
+        }
+        untrusted = {
+            "name": "bookfusion",
+            "title": "Fake BookFusion",
+            "version": "9.9.9",
+            "repository": "attacker/bookfusion-crosspoint-plugin",
+        }
+        policy = {
+            "official": [
+                {
+                    "plugin": "bookfusion",
+                    "source_catalog": "https://trusted.test/catalog.json",
+                }
+            ]
+        }
+
+        official, community = build_catalog.split_plugins_by_policy(
+            [untrusted],
+            [trusted],
+            [],
+            policy,
+        )
+
+        self.assertEqual(official, [trusted])
+        self.assertEqual(community, [])
+
+    def test_duplicate_community_plugin_id_is_rejected(self):
+        first = {
+            "name": "example",
+            "title": "Example",
+            "version": "1.0.0",
+            "repository": "owner/one",
+        }
+        second = {
+            "name": "example",
+            "title": "Example Fork",
+            "version": "2.0.0",
+            "repository": "owner/two",
+        }
+
+        with self.assertRaises(build_catalog.CatalogError):
+            build_catalog.split_plugins_by_policy([first, second], [], [], {"official": []})
+
+    def test_discovery_preserves_duplicate_ids_for_policy_collision_check(self):
+        class DuplicateDiscoveryClient:
+            repositories = [
+                {
+                    "full_name": "owner/one.crosspoint-plugin",
+                    "name": "one.crosspoint-plugin",
+                    "owner": {"login": "owner"},
+                },
+                {
+                    "full_name": "other/two.crosspoint-plugin",
+                    "name": "two.crosspoint-plugin",
+                    "owner": {"login": "other"},
+                },
+            ]
+
+            def search_repositories(self, query):
+                return self.repositories
+
+            def latest_stable_release(self, full_name):
+                return {"tag_name": "v1.0.0"}
+
+            def root_contents(self, full_name, ref):
+                return [
+                    {"name": "manifest.json", "type": "file"},
+                    {"name": "plugin.js", "type": "file"},
+                ]
+
+            def json_file(self, full_name, ref, path):
+                return {
+                    "name": "duplicate-id",
+                    "title": full_name,
+                    "version": "1.0.0",
+                    "files": ["manifest.json", "plugin.js"],
+                }
+
+        discovered = build_catalog.discover_plugins(DuplicateDiscoveryClient())
+
+        self.assertEqual(len(discovered), 2)
+        self.assertEqual([item["name"] for item in discovered], ["duplicate-id", "duplicate-id"])
+        with self.assertRaises(build_catalog.CatalogError):
+            build_catalog.split_plugins_by_policy(discovered, [], [], {"official": []})
+
+    def test_split_places_unlisted_plugins_in_community(self):
+        official_entry = {
+            "name": "bookfusion",
+            "title": "BookFusion",
+            "version": "1.2.0",
+            "source_catalog": "https://trusted.test/catalog.json",
+        }
+        community_entry = {
+            "name": "send2ereader",
+            "title": "Send2Ereader",
+            "version": "0.1.4",
+            "repository": "jadehawk/send2ereader.crosspoint-plugin",
+        }
+        policy = {
+            "official": [
+                {
+                    "plugin": "bookfusion",
+                    "source_catalog": "https://trusted.test/catalog.json",
+                }
+            ]
+        }
+
+        official, community = build_catalog.split_plugins_by_policy(
+            [community_entry],
+            [official_entry],
+            [],
+            policy,
+        )
+
+        self.assertEqual([item["name"] for item in official], ["bookfusion"])
+        self.assertEqual([item["name"] for item in community], ["send2ereader"])
 
     def test_load_whitelist_accepts_manual_release_asset_repository_names(self):
         with tempfile.TemporaryDirectory() as temp_dir:

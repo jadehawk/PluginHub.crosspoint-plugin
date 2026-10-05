@@ -289,6 +289,51 @@ def load_whitelist(path: Path) -> dict[str, Any]:
     }
 
 
+def load_policy(path: Path) -> dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CatalogError(f"catalog policy is not valid JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise CatalogError("catalog policy root must be an object")
+
+    official = payload.get("official", [])
+    if not isinstance(official, list) or not all(isinstance(item, dict) for item in official):
+        raise CatalogError("catalog policy official entries must be objects")
+
+    seen_ids: set[str] = set()
+    normalized: list[dict[str, str]] = []
+    for entry in official:
+        plugin_id = entry.get("plugin")
+        repository = entry.get("repository")
+        source_catalog = entry.get("source_catalog")
+        if not isinstance(plugin_id, str) or PLUGIN_ID_RE.fullmatch(plugin_id) is None:
+            raise CatalogError("catalog policy official plugin ids must be safe plugin ids")
+        if plugin_id in seen_ids:
+            raise CatalogError(f"duplicate official plugin id in catalog policy: {plugin_id}")
+
+        sources = int(isinstance(repository, str)) + int(isinstance(source_catalog, str))
+        if sources != 1:
+            raise CatalogError(
+                f"official plugin {plugin_id!r} must declare exactly one trusted repository or source_catalog"
+            )
+        if isinstance(repository, str) and REPOSITORY_RE.fullmatch(repository) is None:
+            raise CatalogError(f"official plugin {plugin_id!r} has an invalid repository")
+        if isinstance(source_catalog, str) and not source_catalog.startswith(("https://", "http://")):
+            raise CatalogError(f"official plugin {plugin_id!r} has an invalid source_catalog")
+
+        normalized_entry = {"plugin": plugin_id}
+        if isinstance(repository, str):
+            normalized_entry["repository"] = repository
+        else:
+            assert isinstance(source_catalog, str)
+            normalized_entry["source_catalog"] = source_catalog
+        normalized.append(normalized_entry)
+        seen_ids.add(plugin_id)
+
+    return {"official": normalized}
+
+
 def pin_raw_github_base(client: GitHubClient, base: str) -> str:
     match = RAW_GITHUB_BASE_RE.fullmatch(base)
     if match is None:
@@ -664,17 +709,65 @@ def release_asset_plugins(
     return plugins
 
 
-def merge_plugins(
+def _matches_official_source(plugin: dict[str, Any], policy_entry: dict[str, str]) -> bool:
+    repository = policy_entry.get("repository")
+    if repository is not None:
+        candidate_repository = plugin.get("repository")
+        return isinstance(candidate_repository, str) and candidate_repository.lower() == repository.lower()
+
+    source_catalog = policy_entry.get("source_catalog")
+    return isinstance(source_catalog, str) and plugin.get("source_catalog") == source_catalog
+
+
+def split_plugins_by_policy(
     release_plugins: list[dict[str, Any]],
     curated_plugins: list[dict[str, Any]],
-    asset_plugins: list[dict[str, Any]] | None = None,
-) -> list[dict[str, Any]]:
-    merged = {plugin["name"]: plugin for plugin in curated_plugins}
-    for plugin in release_plugins:
-        merged[plugin["name"]] = plugin
-    for plugin in asset_plugins or []:
-        merged[plugin["name"]] = plugin
-    return sorted(merged.values(), key=lambda item: (item["title"].casefold(), item["name"]))
+    asset_plugins: list[dict[str, Any]],
+    policy: dict[str, Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    for plugin in [*curated_plugins, *release_plugins, *asset_plugins]:
+        candidates.setdefault(plugin["name"], []).append(plugin)
+
+    official_policy = {
+        entry["plugin"]: entry
+        for entry in policy.get("official", [])
+    }
+    official: list[dict[str, Any]] = []
+    community: list[dict[str, Any]] = []
+
+    for plugin_id, entries in candidates.items():
+        policy_entry = official_policy.get(plugin_id)
+        if policy_entry is not None:
+            trusted = [entry for entry in entries if _matches_official_source(entry, policy_entry)]
+            if len(trusted) != 1:
+                raise CatalogError(
+                    f"official plugin {plugin_id!r} must resolve to exactly one trusted source; found {len(trusted)}"
+                )
+            if len(entries) > 1:
+                ignored = len(entries) - 1
+                print(
+                    f"official plugin {plugin_id!r}: ignored {ignored} conflicting untrusted candidate"
+                    + ("s" if ignored != 1 else ""),
+                    file=sys.stderr,
+                )
+            official.append(trusted[0])
+            continue
+
+        if len(entries) != 1:
+            raise CatalogError(
+                f"duplicate community plugin id {plugin_id!r} across {len(entries)} sources"
+            )
+        community.append(entries[0])
+
+    missing = sorted(set(official_policy) - set(candidates))
+    if missing:
+        raise CatalogError("official plugins missing from discovered inputs: " + ", ".join(missing))
+
+    sort_key = lambda item: (item["title"].casefold(), item["name"])
+    official.sort(key=sort_key)
+    community.sort(key=sort_key)
+    return official, community
 
 
 def build_entry(
@@ -764,7 +857,6 @@ def discover_plugins(
             discovered[key] = client.repository(full_name)
 
     plugins: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
     for repo in discovered.values():
         full_name = repo.get("full_name", "")
         if excluded_repository and full_name.lower() == excluded_repository.lower():
@@ -787,10 +879,6 @@ def discover_plugins(
             continue
         if entry is None:
             continue
-        if entry["name"] in seen_ids:
-            print(f"skip {full_name}: duplicate plugin id {entry['name']!r}", file=sys.stderr)
-            continue
-        seen_ids.add(entry["name"])
         plugins.append(entry)
 
     plugins.sort(key=lambda item: (item["title"].casefold(), item["name"]))
@@ -807,16 +895,21 @@ def load_existing(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
-def write_catalog(path: Path, plugins: list[dict[str, Any]]) -> bool:
+def write_catalog(
+    path: Path,
+    plugins: list[dict[str, Any]],
+    name: str = "Plugin Hub",
+) -> bool:
     existing = load_existing(path)
     old_plugins = existing.get("plugins")
+    old_name = existing.get("name")
     generated_at = existing.get("generated_at")
-    changed = old_plugins != plugins
+    changed = old_plugins != plugins or old_name != name
     if changed or not isinstance(generated_at, str):
         generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     payload = {
-        "name": "Plugin Hub",
+        "name": name,
         "schema_version": 1,
         "generated_at": generated_at,
         "plugins": plugins,
@@ -831,8 +924,11 @@ def write_catalog(path: Path, plugins: list[dict[str, Any]]) -> bool:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", default="catalog.json", help="catalog path to write")
+    parser.add_argument("--output", default="catalog.json", help="compatibility union catalog path")
+    parser.add_argument("--official-output", default="official-catalog.json", help="official catalog path")
+    parser.add_argument("--community-output", default="community-catalog.json", help="community catalog path")
     parser.add_argument("--whitelist", default="whitelist.json", help="curated plugin whitelist")
+    parser.add_argument("--policy", default="catalog-policy.json", help="catalog classification policy")
     parser.add_argument(
         "--exclude-repository",
         default=os.environ.get("GITHUB_REPOSITORY", "jadehawk/PluginHub.crosspoint-plugin"),
@@ -853,6 +949,7 @@ def main() -> int:
     client = GitHubClient(token)
     try:
         whitelist = load_whitelist(Path(args.whitelist))
+        policy = load_policy(Path(args.policy))
         release_plugins = discover_plugins(
             client,
             args.exclude_repository,
@@ -866,16 +963,31 @@ def main() -> int:
             Path(RELEASE_ASSET_MIRROR_DIR),
         )
         curated_plugins = curated_catalog_plugins(client, whitelist)
-        plugins = merge_plugins(release_plugins, curated_plugins, asset_plugins)
+        official_plugins, community_plugins = split_plugins_by_policy(
+            release_plugins,
+            curated_plugins,
+            asset_plugins,
+            policy,
+        )
+        plugins = sorted(
+            [*official_plugins, *community_plugins],
+            key=lambda item: (item["title"].casefold(), item["name"]),
+        )
     except CatalogError as exc:
         print(f"catalog build failed: {exc}", file=sys.stderr)
         return 1
 
-    changed = write_catalog(Path(args.output), plugins)
+    changes = {
+        "compatibility": write_catalog(Path(args.output), plugins, "Plugin Hub"),
+        "official": write_catalog(Path(args.official_output), official_plugins, "Official Plugins"),
+        "community": write_catalog(Path(args.community_output), community_plugins, "Community Plugins"),
+    }
+    changed_names = [name for name, changed in changes.items() if changed]
     print(
-        f"catalog {'updated' if changed else 'unchanged'}: "
-        f"{len(plugins)} plugins ({len(release_plugins)} release-discovered, "
-        f"{len(asset_plugins)} release-asset, {len(curated_plugins)} curated)"
+        f"catalogs {'updated: ' + ', '.join(changed_names) if changed_names else 'unchanged'}; "
+        f"{len(official_plugins)} official, {len(community_plugins)} community, {len(plugins)} total "
+        f"({len(release_plugins)} release-discovered, {len(asset_plugins)} release-asset, "
+        f"{len(curated_plugins)} curated)"
     )
     return 0
 

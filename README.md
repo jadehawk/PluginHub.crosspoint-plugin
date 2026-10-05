@@ -1,11 +1,18 @@
 # Plugin Hub
 
 Plugin Hub is a CrossPoint SD-card plugin that discovers, installs, and updates
-community plugins without requiring the CrossPoint firmware repository to host or
-maintain the community catalog.
+plugins without requiring the CrossPoint firmware repository to host or maintain
+the catalog.
 
-The reader only consumes this repository's generated `catalog.json`. GitHub
-Actions does the heavier discovery work off-device.
+Plugin Hub publishes two user-facing catalogs: **Official Plugins** for explicitly
+curated CrossPoint ecosystem plugins and **Community Plugins** for valid third-party
+plugins discovered from community developers. GitHub Actions does the heavier
+discovery and classification work off-device.
+
+For backward compatibility, `catalog.json` remains a generated union of both
+catalogs. New Plugin Hub interfaces use `official-catalog.json` and
+`community-catalog.json` directly and do not expose the compatibility union as a
+third browsing choice.
 
 ## Get your plugin into Plugin Hub
 
@@ -19,6 +26,8 @@ Actions does the heavier discovery work off-device.
 > instead of asking for manual allowlisting. This is a project convention rather
 > than a formal CrossPoint requirement, modeled after the predictable standalone
 > plugin layout used by the KOReader plugin ecosystem.
+
+For the concise standalone-repository contract, see [`PLUGIN_REPOSITORY_STANDARD.md`](PLUGIN_REPOSITORY_STANDARD.md).
 
 Choose the path that matches how your plugin is published:
 
@@ -92,18 +101,23 @@ manual allowlist entry.
    supported release-asset package.
 2. Plugin Hub discovers standalone candidates on GitHub and also reads explicitly
    configured sources from `whitelist.json`.
-3. The catalog builder validates versions and install files.
-4. `catalog.json` is generated from immutable release tags, commit SHAs, or
-   versioned mirrored release-asset payloads.
-5. Plugin Hub's `device.json` presents that catalog using CrossPoint's built-in
-   plugin catalog UI.
-6. CrossPoint installs each selected bundle under
+3. The catalog builder validates versions and install files, then applies
+   `catalog-policy.json`.
+4. IDs explicitly listed in the policy are published in **Official Plugins** only
+   when they resolve to their declared trusted source. All other valid discovered
+   plugins are published in **Community Plugins**.
+5. The builder writes `official-catalog.json`, `community-catalog.json`, and the
+   backward-compatible union `catalog.json` from immutable release tags, commit
+   SHAs, or versioned mirrored release-asset payloads.
+6. Plugin Hub's `device.json` presents Official and Community as separate built-in
+   lists using CrossPoint's existing catalog-list UI.
+7. CrossPoint installs each selected bundle under
    `/.crosspoint/plugins/<plugin-id>/`.
 
 Plugin Hub uses both CrossPoint plugin surfaces: `device.json` provides the
-on-reader catalog, while `plugin.js` provides the browser-side management UI.
-Installation and updating still use CrossPoint's existing declarative bundle
-installer.
+on-reader Official/Community chooser, while `plugin.js` provides the browser-side
+management UI. Installation and updating still use CrossPoint's existing
+declarative bundle installer.
 
 ## Detailed requirements for the recommended no-PR path
 
@@ -257,13 +271,20 @@ For these entries:
   hardcoded version.
 - On every refresh, Plugin Hub reads the current upstream catalog.
 - The upstream catalog's **`version` field is the version source of truth**.
-- Plugin Hub copies that version into its generated `catalog.json`.
+- Plugin Hub copies that version into the appropriate generated catalog.
 - If the upstream `base` points to a GitHub Raw branch such as `main`, Plugin
   Hub resolves that branch to its current 40-character commit SHA so the files in
   the generated catalog are an immutable snapshot.
-- Source precedence is **curated catalog < standalone release-discovered <
-  release-asset monorepo**. If the same plugin ID appears in more than one source,
-  the higher-precedence source wins.
+
+Classification is intentionally separate from source ingestion. `whitelist.json`
+answers **where a candidate can come from**; `catalog-policy.json` answers **which
+specific plugin IDs and sources are Official**. Repository ownership alone never
+makes a plugin Official.
+
+If an Official ID is also claimed by another source, the trusted source declared
+in `catalog-policy.json` wins and the conflicting candidate is ignored. If two
+Community candidates claim the same plugin ID, the catalog refresh fails instead
+of silently selecting one.
 
 **Changing files in an upstream branch without bumping the upstream catalog
 version will not produce a usable version update for installed users.** The
@@ -274,7 +295,7 @@ change.
 The current whitelist imports selected entries from the existing CrossPoint
 Plugin Store but intentionally excludes its legacy `send2ereader` entry.
 `jadehawk/send2ereader.crosspoint-plugin` is release-discovered and is the
-authoritative source for the `send2ereader` plugin ID.
+authoritative Community source for the `send2ereader` plugin ID.
 
 ## Curated whitelist
 
@@ -349,7 +370,7 @@ The `Refresh Plugin Catalog` workflow runs every three hours and can also be run
 manually. It:
 
 1. syncs to the current `main` branch;
-2. runs the catalog builder test suite;
+2. runs the catalog builder and browser Plugin Hub test suites;
 3. searches GitHub using the automatic discovery rules;
 4. loads `whitelist.json`, including manually configured release-asset monorepos and
    catalog plugin IDs;
@@ -357,11 +378,12 @@ manually. It:
    every matching plugin ZIP, and mirrors runtime files into `release-assets/`;
 6. validates release-driven entries and pins mutable GitHub Raw bases from curated
    catalogs to commit SHAs;
-7. merges the sources, with release-asset plugins taking precedence over standalone
-   release-discovered plugins and curated duplicates;
-8. rebuilds `catalog.json`;
-9. commits `catalog.json` and any new release-asset mirror files only when staged
-   contents changed.
+7. loads `catalog-policy.json` and resolves the explicitly trusted Official IDs;
+8. rejects ambiguous Community plugin-ID collisions instead of choosing a winner;
+9. rebuilds `official-catalog.json`, `community-catalog.json`, and compatibility
+   union `catalog.json`;
+10. commits all generated catalogs and any new release-asset mirror files only when
+    staged contents changed.
 
 The generated timestamp is preserved when the catalog contents are unchanged, so
 scheduled runs do not create timestamp-only commits.
@@ -444,16 +466,24 @@ Open:
 Settings → System → Plugins → Plugin Hub
 ```
 
-The reader uses `device.json` and browses the main generated Plugin Hub catalog
-directly.
+The reader uses the firmware's existing `browse.lists` support and first presents
+two choices:
+
+```text
+Official Plugins
+Community Plugins
+```
+
+Selecting either entry opens the normal plugin list for that catalog. Back from a
+plugin list returns to the Official/Community chooser. No firmware-specific Plugin
+Hub code is required for this split.
 
 ### From the device web UI
 
 Plugin Hub also mounts a browser-side management card under **Settings** through
 `plugin.js`. The card shows the installed Plugin Hub version from its own
-`manifest.json` and checks the latest stable GitHub Release, matching the
-Send2Ereader WebUI behavior. It provides the same plugin-management flow as the
-original CrossPoint Plugin Store:
+`manifest.json` and checks the latest stable GitHub Release. It provides the same
+plugin-management actions as before:
 
 - install an available plugin;
 - update when the catalog version is newer than the installed version;
@@ -461,12 +491,15 @@ original CrossPoint Plugin Store:
 - remove an installed plugin;
 - show installed/catalog versions and update counts.
 
-The built-in Plugin Hub catalog is always present and cannot be removed from this
-browser card.
+The browser card shows **Official Plugins** and **Community Plugins** as two
+non-removable built-in browse choices. Official is selected when Plugin Hub opens,
+and only the selected catalog is loaded at a time. The compatibility `catalog.json`
+feed is not shown as another choice.
 
 #### Add custom, test, or private catalogs
 
-Under **Catalogs**, add any additional catalog URL and choose **Save & refresh**.
+Expand **Custom catalogs** to add another catalog URL. Custom catalogs remain
+separate from the two built-ins and can be selected with **Browse**.
 
 On firmware that provides the newer plugin-directory API, Plugin Hub stores its
 configuration inside its actual plugin directory as `config.json`. This keeps the
@@ -489,10 +522,9 @@ Plugin Hub also uses `api.dir` when available to read its own `manifest.json`
 for self-version detection, with the legacy `/.crosspoint/plugins/pluginhub`
 lookup retained as a fallback.
 
-Additional catalogs are loaded alongside the built-in Plugin Hub catalog and each
-catalog is shown under its own heading. A custom catalog can be hosted on GitHub
-Raw, a LAN server, a private/test web server, or another HTTP(S) endpoint that the
-device can fetch.
+A custom catalog becomes another secondary browser choice; it is not merged into
+Official or Community. A custom catalog can be hosted on GitHub Raw, a LAN server,
+a private/test web server, or another HTTP(S) endpoint that the device can fetch.
 
 A minimal custom catalog is:
 
@@ -525,15 +557,19 @@ device can fetch directly, such as a signed URL or a reachable authenticated
 endpoint that does not require interactive browser login.
 
 Custom catalogs are currently a **browser-side Plugin Hub feature**. The on-reader
-Plugin Hub screen continues to use the main generated Plugin Hub catalog from
-`device.json`.
+Plugin Hub screen exposes only the built-in Official and Community catalogs defined
+in `device.json`.
 
 ## Trust model
 
-Plugin Hub discovers community repositories automatically. Discovery and schema
-validation do not constitute a security review or endorsement of a plugin.
-Users should treat third-party plugins as software from their respective
-publishers.
+**Official** is an explicit curation classification, not an inference from the
+repository owner or where a plugin is hosted. Each Official plugin ID is tied to a
+trusted source in `catalog-policy.json`.
+
+**Community** contains valid plugins from third-party developers that are not
+explicitly classified Official. Automatic discovery and schema validation do not
+constitute a security review or endorsement; users should treat third-party
+plugins as software from their respective publishers.
 
 ## Current firmware note
 

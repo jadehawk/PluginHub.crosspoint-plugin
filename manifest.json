@@ -2,7 +2,7 @@
   "name": "pluginhub",
   "title": "Plugin Hub",
   "mount": "settings",
-  "description": "Discover, install, and update CrossPoint community plugins.",
+  "description": "Discover, install, and update CrossPoint plugins.",
   "author": "Jadehawk",
   "version": "0.1.4",
   "files": [

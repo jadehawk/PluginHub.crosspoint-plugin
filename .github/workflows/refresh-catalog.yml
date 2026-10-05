@@ -11,8 +11,10 @@ on:
       - "tools/build_catalog.py"
       - "tests/**"
       - "plugin.js"
+      - "device.json"
       - "manifest.json"
       - "whitelist.json"
+      - "catalog-policy.json"
       - ".github/workflows/refresh-catalog.yml"
 
 permissions:
@@ -56,11 +58,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add catalog.json release-assets
+          git add catalog.json official-catalog.json community-catalog.json release-assets
           if git diff --cached --quiet; then
-            echo "Catalog and release-asset mirror are unchanged."
+            echo "Catalogs and release-asset mirror are unchanged."
             exit 0
           fi
-          git commit -m "chore: refresh plugin catalog"
+          git commit -m "chore: refresh plugin catalogs"
           git pull --rebase origin main
           git push origin HEAD:main

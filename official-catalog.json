@@ -1,5 +1,5 @@
 {
-  "name": "Plugin Hub",
+  "name": "Official Plugins",
   "schema_version": 1,
   "generated_at": "2026-10-05T04:01:49Z",
   "plugins": [
@@ -47,20 +47,6 @@
       ]
     },
     {
-      "name": "monthwallpaper",
-      "title": "Month Wallpaper",
-      "description": "Download a month-calendar sleep wallpaper from Month Wallpaper server.",
-      "author": "marczykm",
-      "version": "1.0.0",
-      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json",
-      "base": "https://raw.githubusercontent.com/marczykm/month-wallpaper-crosspoint-plugin/c9df145639e5056bb465292d1078ba6f85c2677d/",
-      "files": [
-        "manifest.json",
-        "device.json",
-        "README.md"
-      ]
-    },
-    {
       "name": "plugin-store",
       "title": "Plugin Store",
       "description": "Browse and install plugins from a hosted catalog.",
@@ -86,43 +72,6 @@
       "files": [
         "manifest.json",
         "plugin.js"
-      ]
-    },
-    {
-      "name": "readest",
-      "title": "Readest",
-      "description": "Your Readest library, reading statistics and reading progress on CrossPoint.",
-      "author": "Readest",
-      "version": "0.12.12",
-      "repository": "readest/readest",
-      "release": "v0.12.12",
-      "release_url": "https://github.com/readest/readest/releases/tag/v0.12.12",
-      "release_asset": "Readest-0.12.12.crosspoint-plugin.zip",
-      "published_at": "2026-10-04T21:14:17Z",
-      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/release-assets/readest/0.12.12/",
-      "files": [
-        "manifest.json",
-        "device.json",
-        "plugin.js",
-        "README.md"
-      ]
-    },
-    {
-      "name": "send2ereader",
-      "title": "Send2Ereader",
-      "description": "Create or join a Send2Ereader session and receive books on CrossPoint.",
-      "author": "Jadehawk",
-      "version": "0.1.5",
-      "repository": "jadehawk/send2ereader.crosspoint-plugin",
-      "release": "v0.1.5",
-      "release_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.5",
-      "published_at": "2026-10-05T02:08:09Z",
-      "base": "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.5/",
-      "files": [
-        "manifest.json",
-        "device.json",
-        "plugin.js",
-        "README.md"
       ]
     },
     {

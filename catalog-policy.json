@@ -1,0 +1,36 @@
+{
+  "official": [
+    {
+      "plugin": "bookfusion",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "dictionaries",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "hello",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "organize-by-author",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "plugin-store",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "protected-content",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "wallabag",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    },
+    {
+      "plugin": "webdav",
+      "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
+    }
+  ]
+}
