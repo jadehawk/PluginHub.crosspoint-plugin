@@ -1,7 +1,7 @@
 {
   "name": "Plugin Hub",
   "schema_version": 1,
-  "generated_at": "2026-10-04T23:58:46Z",
+  "generated_at": "2026-10-05T02:10:18Z",
   "plugins": [
     {
       "name": "bookfusion",
@@ -112,12 +112,12 @@
       "title": "Send2Ereader",
       "description": "Create or join a Send2Ereader session and receive books on CrossPoint.",
       "author": "Jadehawk",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "repository": "jadehawk/send2ereader.crosspoint-plugin",
-      "release": "v0.1.4",
-      "release_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.4",
-      "published_at": "2026-10-02T02:18:29Z",
-      "base": "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.4/",
+      "release": "v0.1.5",
+      "release_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.5",
+      "published_at": "2026-10-05T02:08:09Z",
+      "base": "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.5/",
       "files": [
         "manifest.json",
         "device.json",
