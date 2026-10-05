@@ -10,6 +10,8 @@ const OFFICIAL_CATALOG =
   'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/official-catalog.json';
 const COMMUNITY_CATALOG =
   'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/community-catalog.json';
+const LIST_INDEX =
+  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog-lists.json';
 const PRIVATE_CATALOG = 'https://example.test/private/catalog.json';
 
 class Element {
@@ -118,6 +120,8 @@ test('browser hub loads custom catalogs and only offers directional updates', as
   const document = fakeDocument();
   const writes = [];
   const relayCalls = [];
+  const fetchToSdCalls = [];
+  let deletedCache = false;
 
   const officialCatalog = {
     name: 'Official Plugins',
@@ -180,6 +184,9 @@ test('browser hub loads custom catalogs and only offers directional updates', as
       if (path === '/.crosspoint/plugins/send2ereader/manifest.json') {
         return response({ text: JSON.stringify({ version: '0.1.2.1' }) });
       }
+      if (path === '/.crosspoint/plugins/pluginhub/.catalog-cache.json') {
+        return response({ text: JSON.stringify(communityCatalog) });
+      }
       return response({ status: 404 });
     }
 
@@ -190,6 +197,11 @@ test('browser hub loads custom catalogs and only offers directional updates', as
           { name: 'send2ereader', isDirectory: true },
         ],
       });
+    }
+
+    if (url === '/delete') {
+      deletedCache = true;
+      return response({});
     }
 
     throw new Error('unexpected fetch: ' + url);
@@ -206,6 +218,17 @@ test('browser hub loads custom catalogs and only offers directional updates', as
     async relay(method, url) {
       assert.equal(method, 'GET');
       relayCalls.push(url);
+      if (url === LIST_INDEX) {
+        return {
+          status: 200,
+          body: JSON.stringify({
+            lists: [
+              { title: 'Official Plugins', url: OFFICIAL_CATALOG },
+              { title: 'Community Plugins', url: COMMUNITY_CATALOG },
+            ],
+          }),
+        };
+      }
       if (url.includes('/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest')) {
         return { status: 200, body: JSON.stringify({ tag_name: 'v0.1.1' }) };
       }
@@ -213,14 +236,15 @@ test('browser hub loads custom catalogs and only offers directional updates', as
         return { status: 200, body: JSON.stringify(officialCatalog) };
       }
       if (url === COMMUNITY_CATALOG) {
-        return { status: 200, body: JSON.stringify(communityCatalog) };
+        return { status: 502, error: 'relay failed; large bodies need /api/fetch' };
       }
       if (url === PRIVATE_CATALOG) {
         return { status: 200, body: JSON.stringify(privateCatalog) };
       }
       return { status: 404, body: '' };
     },
-    async fetchToSd() {
+    async fetchToSd(url, dest) {
+      fetchToSdCalls.push({ url, dest });
       return { status: 200 };
     },
   };
@@ -228,9 +252,10 @@ test('browser hub loads custom catalogs and only offers directional updates', as
   const render = await loadPlugin({ document, fetch });
   await render({ innerHTML: '' }, api);
 
-  assert.equal(relayCalls.length, 2);
-  assert.match(relayCalls[0], /PluginHub\.crosspoint-plugin\/releases\/latest$/);
-  assert.deepEqual(relayCalls.slice(1), [OFFICIAL_CATALOG]);
+  assert.equal(relayCalls.length, 3);
+  assert.equal(relayCalls[0], LIST_INDEX);
+  assert.match(relayCalls[1], /PluginHub\.crosspoint-plugin\/releases\/latest$/);
+  assert.deepEqual(relayCalls.slice(2), [OFFICIAL_CATALOG]);
   assert.equal(document.elements['ph-version'].textContent, 'Version: v0.1.1');
 
   const catalogRows = document.elements['ph-catalogs'].children;
@@ -262,6 +287,10 @@ test('browser hub loads custom catalogs and only offers directional updates', as
 
   await catalogRows[1].children[1].onclick();
   assert.equal(relayCalls.at(-1), COMMUNITY_CATALOG);
+  assert.deepEqual(fetchToSdCalls, [
+    { url: COMMUNITY_CATALOG, dest: '/.crosspoint/plugins/pluginhub/.catalog-cache.json' },
+  ]);
+  assert.equal(deletedCache, true);
   cards = document.elements['ph-list'].children.filter(
     (child) => child.className === 'setting-row'
   );
@@ -336,6 +365,17 @@ test('browser hub adopts api.dir while migrating legacy config', async () => {
     async relay(method, url) {
       assert.equal(method, 'GET');
       relayCalls.push(url);
+      if (url === LIST_INDEX) {
+        return {
+          status: 200,
+          body: JSON.stringify({
+            lists: [
+              { title: 'Official Plugins', url: OFFICIAL_CATALOG },
+              { title: 'Community Plugins', url: COMMUNITY_CATALOG },
+            ],
+          }),
+        };
+      }
       if (url.includes('/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest')) {
         return { status: 200, body: JSON.stringify({ tag_name: 'v0.1.4' }) };
       }
@@ -366,7 +406,7 @@ test('browser hub adopts api.dir while migrating legacy config', async () => {
   assert.deepEqual(JSON.parse(writes[0].data), {
     extraCatalogs: [PRIVATE_CATALOG],
   });
-  assert.deepEqual(relayCalls.slice(1), [OFFICIAL_CATALOG]);
+  assert.deepEqual(relayCalls.slice(2), [OFFICIAL_CATALOG]);
   const customRows = document.elements['ph-custom-catalogs'].children;
   assert.equal(customRows.length, 1);
   assert.equal(customRows[0].children[0].children[0].value, PRIVATE_CATALOG);

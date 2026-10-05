@@ -18,6 +18,17 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from catalog_partitions import (
+    COMMUNITY_CATALOG_MAX_BYTES,
+    COMMUNITY_LIST_INDEX,
+    compact_json,
+    list_index_entries,
+    partition_community_plugins,
+    rendered_catalog_size,
+    shard_filename,
+)
+
 API_BASE = "https://api.github.com"
 SEARCH_QUERIES = (
     "topic:crosspoint-plugin",
@@ -914,7 +925,7 @@ def write_catalog(
         "generated_at": generated_at,
         "plugins": plugins,
     }
-    rendered = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    rendered = compact_json(payload)
     previous = path.read_text(encoding="utf-8") if path.exists() else None
     if previous == rendered:
         return False
@@ -922,11 +933,64 @@ def write_catalog(
     return True
 
 
+def write_list_index(path: Path, lists: list[dict[str, Any]]) -> bool:
+    existing = load_existing(path)
+    generated_at = existing.get("generated_at")
+    changed = existing.get("lists") != lists
+    if changed or not isinstance(generated_at, str):
+        generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    payload = {"schema_version": 1, "generated_at": generated_at, "lists": lists}
+    rendered = compact_json(payload)
+    previous = path.read_text(encoding="utf-8") if path.exists() else None
+    if previous == rendered:
+        return False
+    path.write_text(rendered, encoding="utf-8", newline="\n")
+    return True
+
+
+def write_community_catalogs(
+    community_path: Path,
+    index_path: Path,
+    official_path: Path,
+    plugins: list[dict[str, Any]],
+    repository: str,
+    ref: str,
+    max_bytes: int,
+) -> dict[str, bool]:
+    try:
+        partitions = partition_community_plugins(plugins, max_bytes)
+    except ValueError as exc:
+        raise CatalogError(str(exc)) from exc
+
+    changes: dict[str, bool] = {}
+    desired: set[Path] = set()
+    for partition in partitions:
+        filename = shard_filename(community_path.name, partition)
+        path = community_path.with_name(filename)
+        desired.add(path)
+        key = "community" if not partition.label else f"community-{partition.label.lower()}"
+        changes[key] = write_catalog(path, partition.plugins, partition.title)
+
+    stale_candidates = set(community_path.parent.glob(f"{community_path.stem}-*{community_path.suffix}"))
+    stale_candidates.add(community_path)
+    for stale in sorted(stale_candidates - desired):
+        if stale.exists():
+            stale.unlink()
+            changes[f"removed-{stale.name}"] = True
+
+    lists = list_index_entries(repository, ref, official_path.name, community_path.name, partitions)
+    changes["list-index"] = write_list_index(index_path, lists)
+    return changes
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default="catalog.json", help="compatibility union catalog path")
     parser.add_argument("--official-output", default="official-catalog.json", help="official catalog path")
     parser.add_argument("--community-output", default="community-catalog.json", help="community catalog path")
+    parser.add_argument("--list-index-output", default=COMMUNITY_LIST_INDEX, help="dynamic native catalog list index path")
+    parser.add_argument("--catalog-ref", default=os.environ.get("PLUGINHUB_CATALOG_REF", "main"), help="git ref used by generated raw catalog URLs")
+    parser.add_argument("--community-max-bytes", type=int, default=COMMUNITY_CATALOG_MAX_BYTES, help="maximum serialized bytes per Community catalog shard")
     parser.add_argument("--whitelist", default="whitelist.json", help="curated plugin whitelist")
     parser.add_argument("--policy", default="catalog-policy.json", help="catalog classification policy")
     parser.add_argument(
@@ -977,11 +1041,26 @@ def main() -> int:
         print(f"catalog build failed: {exc}", file=sys.stderr)
         return 1
 
+    official_path = Path(args.official_output)
     changes = {
         "compatibility": write_catalog(Path(args.output), plugins, "Plugin Hub"),
-        "official": write_catalog(Path(args.official_output), official_plugins, "Official Plugins"),
-        "community": write_catalog(Path(args.community_output), community_plugins, "Community Plugins"),
+        "official": write_catalog(official_path, official_plugins, "Official Plugins"),
     }
+    try:
+        changes.update(
+            write_community_catalogs(
+                Path(args.community_output),
+                Path(args.list_index_output),
+                official_path,
+                community_plugins,
+                args.catalog_repository,
+                args.catalog_ref,
+                args.community_max_bytes,
+            )
+        )
+    except CatalogError as exc:
+        print(f"catalog build failed: {exc}", file=sys.stderr)
+        return 1
     changed_names = [name for name, changed in changes.items() if changed]
     print(
         f"catalogs {'updated: ' + ', '.join(changed_names) if changed_names else 'unchanged'}; "

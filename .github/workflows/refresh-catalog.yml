@@ -58,7 +58,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add catalog.json official-catalog.json community-catalog.json release-assets
+          git add -A catalog.json official-catalog.json catalog-lists.json "community-catalog*.json" release-assets
           if git diff --cached --quiet; then
             echo "Catalogs and release-asset mirror are unchanged."
             exit 0

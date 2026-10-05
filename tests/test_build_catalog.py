@@ -680,8 +680,116 @@ class CatalogBuilderTests(unittest.TestCase):
             changed = build_catalog.write_catalog(path, plugins)
             payload = json.loads(path.read_text(encoding="utf-8"))
 
-            self.assertFalse(changed)
+            self.assertTrue(changed)
             self.assertEqual(payload["generated_at"], "2026-10-01T00:00:00Z")
+            self.assertEqual(len(path.read_text(encoding="utf-8").splitlines()), 1)
+
+            changed_again = build_catalog.write_catalog(path, plugins)
+            self.assertFalse(changed_again)
+
+
+    def _synthetic_community_plugins(self):
+        plugins = []
+        for code in range(ord("A"), ord("Z") + 1):
+            letter = chr(code)
+            plugins.append(
+                {
+                    "name": f"{letter.lower()}-plugin",
+                    "title": f"{letter} Plugin",
+                    "description": "x" * 240,
+                    "author": "Stress Author",
+                    "version": "1.0.0",
+                    "base": f"https://example.invalid/{letter.lower()}/",
+                    "files": ["manifest.json", "device.json", "plugin.js"],
+                }
+            )
+        return plugins
+
+    def test_partition_community_plugins_uses_minimum_balanced_letter_ranges(self):
+        plugins = self._synthetic_community_plugins()
+        full_size = build_catalog.rendered_catalog_size(plugins, "Community Plugins")
+        max_bytes = int(full_size * 0.60)
+
+        partitions = build_catalog.partition_community_plugins(plugins, max_bytes)
+
+        self.assertEqual(len(partitions), 2)
+        self.assertEqual(
+            [plugin["name"] for part in partitions for plugin in part.plugins],
+            [plugin["name"] for plugin in plugins],
+        )
+        for part in partitions:
+            self.assertLessEqual(
+                build_catalog.rendered_catalog_size(part.plugins, part.title),
+                max_bytes,
+            )
+        self.assertNotEqual(partitions[0].label, "")
+        self.assertNotEqual(partitions[1].label, "")
+
+    def test_partition_community_plugins_expands_to_three_ranges_when_needed(self):
+        plugins = self._synthetic_community_plugins()
+        full_size = build_catalog.rendered_catalog_size(plugins, "Community Plugins")
+        max_bytes = int(full_size * 0.40)
+
+        partitions = build_catalog.partition_community_plugins(plugins, max_bytes)
+
+        self.assertEqual(len(partitions), 3)
+        for part in partitions:
+            self.assertLessEqual(
+                build_catalog.rendered_catalog_size(part.plugins, part.title),
+                max_bytes,
+            )
+
+    def test_dynamic_list_index_repeats_community_notice_for_every_partition(self):
+        plugins = self._synthetic_community_plugins()
+        full_size = build_catalog.rendered_catalog_size(plugins, "Community Plugins")
+        partitions = build_catalog.partition_community_plugins(plugins, int(full_size * 0.60))
+
+        entries = build_catalog.list_index_entries(
+            "jadehawk/PluginHub.crosspoint-plugin",
+            "main",
+            "official-catalog.json",
+            "community-catalog.json",
+            partitions,
+        )
+
+        self.assertEqual(entries[0]["title"], "Official Plugins")
+        self.assertNotIn("notice", entries[0])
+        self.assertEqual(len(entries), 3)
+        for entry in entries[1:]:
+            self.assertTrue(entry["title"].startswith("Community Plugins ["))
+            self.assertEqual(entry["notice"]["message"], "Third-party plugins. Not vetted by Dev Team.")
+            self.assertEqual(entry["notice"]["confirm"], "Continue")
+            self.assertEqual(entry["notice"]["cancel"], "Go Back")
+
+    def test_write_community_catalogs_removes_stale_partition_files(self):
+        plugins = self._synthetic_community_plugins()
+        full_size = build_catalog.rendered_catalog_size(plugins, "Community Plugins")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            community = root / "community-catalog.json"
+            official = root / "official-catalog.json"
+            index = root / "catalog-lists.json"
+            stale = root / "community-catalog-a-z.json"
+            stale.write_text("stale", encoding="utf-8")
+
+            build_catalog.write_community_catalogs(
+                community,
+                index,
+                official,
+                plugins,
+                "jadehawk/PluginHub.crosspoint-plugin",
+                "main",
+                int(full_size * 0.60),
+            )
+
+            self.assertFalse(stale.exists())
+            self.assertFalse(community.exists())
+            payload = json.loads(index.read_text(encoding="utf-8"))
+            self.assertEqual(len(payload["lists"]), 3)
+            for entry in payload["lists"][1:]:
+                filename = entry["url"].rsplit("/", 1)[-1]
+                self.assertTrue((root / filename).exists())
+
 
 
 if __name__ == "__main__":

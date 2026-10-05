@@ -15,20 +15,11 @@ CrossPoint.registerPlugin(async (container, api) => {
     'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/official-catalog.json';
   const COMMUNITY_CATALOG =
     'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/community-catalog.json';
-  const BUILT_IN_CATALOGS = [
-    {
-      title: 'Official Plugins',
-      description: 'Curated and recognized for the CrossPoint ecosystem.',
-      url: OFFICIAL_CATALOG
-    },
-    {
-      title: 'Community Plugins',
-      description: 'Third-party plugins from CrossPoint community developers.',
-      url: COMMUNITY_CATALOG
-    }
-  ];
+  const LIST_INDEX_URL =
+    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog-lists.json';
+  let BUILT_IN_CATALOGS = [];
 
-  let selectedCatalog = OFFICIAL_CATALOG;
+  let selectedCatalog = "";
   let extraCatalogs = [];
 
   container.innerHTML =
@@ -78,7 +69,12 @@ CrossPoint.registerPlugin(async (container, api) => {
   }
 
   function isReservedCatalog(url) {
-    return url === LEGACY_CATALOG || url === OFFICIAL_CATALOG || url === COMMUNITY_CATALOG;
+    return (
+      url === LEGACY_CATALOG ||
+      url === OFFICIAL_CATALOG ||
+      url === COMMUNITY_CATALOG ||
+      BUILT_IN_CATALOGS.some((catalog) => catalog.url === url)
+    );
   }
 
   function normalizeExtraCatalogs(urls) {
@@ -122,11 +118,10 @@ CrossPoint.registerPlugin(async (container, api) => {
   function saveConfig() {
     extraCatalogs = normalizeExtraCatalogs(extraCatalogs);
     if (
-      selectedCatalog !== OFFICIAL_CATALOG &&
-      selectedCatalog !== COMMUNITY_CATALOG &&
+      !BUILT_IN_CATALOGS.some((catalog) => catalog.url === selectedCatalog) &&
       !extraCatalogs.includes(selectedCatalog)
     ) {
-      selectedCatalog = OFFICIAL_CATALOG;
+      selectedCatalog = BUILT_IN_CATALOGS[0]?.url || "";
     }
     return api.writeFile(
       CONFIG_PATH,
@@ -236,12 +231,65 @@ CrossPoint.registerPlugin(async (container, api) => {
     } catch (e) {}
   }
 
-  async function relayText(url) {
-    const response = await api.relay('GET', url, {}, '');
+  async function fetchLargeText(url) {
+    const cachePath = (PLUGIN_DIR || PLUGINS_DIR + '/pluginhub') + '/.catalog-cache.json';
+    const response = await api.fetchToSd(url, cachePath, {});
     if (response.error || (response.status && (response.status < 200 || response.status >= 300))) {
+      throw new Error('download failed (' + (response.status || response.error) + ')');
+    }
+    try {
+      const downloaded = await fetch('/download?path=' + encodeURIComponent(cachePath));
+      if (!downloaded.ok) throw new Error('could not read downloaded catalog');
+      return await downloaded.text();
+    } finally {
+      try {
+        await fetch('/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'path=' + encodeURIComponent(cachePath)
+        });
+      } catch (e) {}
+    }
+  }
+
+  async function relayText(url) {
+    let response;
+    try {
+      response = await api.relay('GET', url, {}, '');
+    } catch (error) {
+      const detail = String(error && error.message ? error.message : error);
+      if (detail.includes('large bodies need /api/fetch') || detail.includes('/api/relay 502')) {
+        return fetchLargeText(url);
+      }
+      throw error;
+    }
+    if (response.error || (response.status && (response.status < 200 || response.status >= 300))) {
+      const detail = String(response.error || response.body || '');
+      if (response.status === 502 || detail.includes('large bodies need /api/fetch')) {
+        return fetchLargeText(url);
+      }
       throw new Error('HTTP ' + (response.status || response.error));
     }
     return response.body;
+  }
+
+  async function loadBuiltInCatalogs() {
+    const payload = JSON.parse(await relayText(LIST_INDEX_URL));
+    const lists = Array.isArray(payload.lists) ? payload.lists : [];
+    const normalized = lists
+      .filter((entry) => entry && entry.title && entry.url)
+      .map((entry) => ({
+        title: String(entry.title),
+        description: String(entry.title).startsWith('Community Plugins')
+          ? 'Third-party plugins from CrossPoint community developers.'
+          : 'Curated and recognized for the CrossPoint ecosystem.',
+        url: String(entry.url)
+      }));
+    if (!normalized.length) throw new Error('catalog list index is empty');
+    BUILT_IN_CATALOGS = normalized;
+    if (!BUILT_IN_CATALOGS.some((catalog) => catalog.url === selectedCatalog)) {
+      selectedCatalog = BUILT_IN_CATALOGS[0].url;
+    }
   }
 
   async function mkdir(path) {
@@ -595,6 +643,14 @@ CrossPoint.registerPlugin(async (container, api) => {
   }
 
   document.getElementById('ph-refresh').onclick = refresh;
+
+  try {
+    await loadBuiltInCatalogs();
+  } catch (e) {
+    status('Error loading catalog index: ' + e.message);
+    renderCatalogs();
+    return;
+  }
 
   const config = await loadConfig();
   if (Array.isArray(config.extraCatalogs)) {
