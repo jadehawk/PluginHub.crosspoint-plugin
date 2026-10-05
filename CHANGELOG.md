@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.1.5
 
 - Split Plugin Hub into separate **Official Plugins** and **Community Plugins** feeds while retaining `catalog.json` as the backward-compatible union feed.
 - Add explicit `catalog-policy.json` curation so Official status is tied to a plugin ID and trusted source instead of repository ownership or discovery order.
 - Make trusted Official sources win conflicting claims and fail catalog generation on ambiguous duplicate Community plugin IDs.
 - Add an on-reader Official/Community chooser through the firmware's existing `browse.lists` support, with no firmware-specific Plugin Hub changes required.
+- Add a concise confirmation notice before opening **Community Plugins** so third-party plugins are clearly identified as not vetted by the Dev Team.
 - Refactor the browser WebUI to browse one built-in catalog at a time, keep Official selected by default, and move custom/private catalogs into a secondary Custom catalogs section.
 - Filter the legacy union and both built-in catalog URLs out of migrated custom-catalog settings so they cannot appear as duplicate user-facing choices.
 - Add `PLUGIN_REPOSITORY_STANDARD.md` documenting the recommended no-PR standalone plugin layout and Community-by-default classification.

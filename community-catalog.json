@@ -28,7 +28,7 @@
       "release_url": "https://github.com/readest/readest/releases/tag/v0.12.12",
       "release_asset": "Readest-0.12.12.crosspoint-plugin.zip",
       "published_at": "2026-10-04T21:14:17Z",
-      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/release-assets/readest/0.12.12/",
+      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/release-assets/readest/0.12.12/",
       "files": [
         "manifest.json",
         "device.json",

@@ -5,11 +5,11 @@ import vm from 'node:vm';
 
 const root = new URL('../', import.meta.url);
 const LEGACY_CATALOG =
-  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/catalog.json';
+  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog.json';
 const OFFICIAL_CATALOG =
-  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/official-catalog.json';
+  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/official-catalog.json';
 const COMMUNITY_CATALOG =
-  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/community-catalog.json';
+  'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/community-catalog.json';
 const PRIVATE_CATALOG = 'https://example.test/private/catalog.json';
 
 class Element {

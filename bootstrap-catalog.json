@@ -6,7 +6,7 @@
       "title": "Plugin Hub",
       "description": "Browse and install CrossPoint plugins.",
       "author": "Jadehawk",
-      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/",
+      "base": "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/stable/",
       "files": [
         "manifest.json",
         "device.json",

@@ -10,11 +10,11 @@ CrossPoint.registerPlugin(async (container, api) => {
   const PLUGINS_DIR = '/.crosspoint/plugins';
   const RELEASE_API_URL = 'https://api.github.com/repos/jadehawk/PluginHub.crosspoint-plugin/releases/latest';
   const LEGACY_CATALOG =
-    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/catalog.json';
+    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/catalog.json';
   const OFFICIAL_CATALOG =
-    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/official-catalog.json';
+    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/official-catalog.json';
   const COMMUNITY_CATALOG =
-    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/official-community-catalogs-test/community-catalog.json';
+    'https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/main/community-catalog.json';
   const BUILT_IN_CATALOGS = [
     {
       title: 'Official Plugins',
