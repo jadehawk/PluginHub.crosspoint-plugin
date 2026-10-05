@@ -300,6 +300,74 @@ def load_whitelist(path: Path) -> dict[str, Any]:
     }
 
 
+def load_blacklist(path: Path) -> dict[str, list[str]]:
+    if not path.exists():
+        return {"repositories": []}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise CatalogError(f"blacklist is not valid JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise CatalogError("blacklist root must be an object")
+
+    repositories = payload.get("repositories", [])
+    if not isinstance(repositories, list) or not all(
+        isinstance(item, str) and REPOSITORY_RE.fullmatch(item) for item in repositories
+    ):
+        raise CatalogError("blacklist repositories must be owner/repository strings")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for repository in repositories:
+        key = repository.lower()
+        if key not in seen:
+            normalized.append(repository)
+            seen.add(key)
+    return {"repositories": normalized}
+
+
+def github_repository_from_url(url: str) -> str | None:
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except ValueError:
+        return None
+    host = parsed.netloc.lower()
+    parts = [part for part in parsed.path.split("/") if part]
+    if host == "raw.githubusercontent.com" and len(parts) >= 2:
+        return f"{parts[0]}/{parts[1]}"
+    if host in {"github.com", "www.github.com"} and len(parts) >= 2:
+        repo = parts[1][:-4] if parts[1].endswith(".git") else parts[1]
+        return f"{parts[0]}/{repo}"
+    return None
+
+
+def is_blacklisted_repository(repository: str | None, blacklisted: set[str]) -> bool:
+    return isinstance(repository, str) and repository.lower() in blacklisted
+
+
+def plugin_entry_is_blacklisted(plugin: dict[str, Any], blacklisted: set[str]) -> bool:
+    repository = plugin.get("repository")
+    if is_blacklisted_repository(repository if isinstance(repository, str) else None, blacklisted):
+        return True
+    for key in ("base", "source_catalog"):
+        value = plugin.get(key)
+        if isinstance(value, str) and is_blacklisted_repository(github_repository_from_url(value), blacklisted):
+            return True
+    return False
+
+
+def filter_blacklisted_policy(policy: dict[str, Any], blacklisted: set[str]) -> dict[str, Any]:
+    official = []
+    for entry in policy.get("official", []):
+        repository = entry.get("repository")
+        source_catalog = entry.get("source_catalog")
+        source_repository = github_repository_from_url(source_catalog) if isinstance(source_catalog, str) else None
+        if is_blacklisted_repository(repository, blacklisted) or is_blacklisted_repository(source_repository, blacklisted):
+            continue
+        official.append(entry)
+    return {"official": official}
+
+
 def load_policy(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -373,15 +441,22 @@ def pin_raw_github_base(client: GitHubClient, base: str) -> str:
     return f"https://raw.githubusercontent.com/{owner}/{repo}/{sha}/{suffix}"
 
 
-def curated_catalog_plugins(client: GitHubClient, whitelist: dict[str, Any]) -> list[dict[str, Any]]:
+def curated_catalog_plugins(
+    client: GitHubClient,
+    whitelist: dict[str, Any],
+    blacklisted_repositories: set[str] | None = None,
+) -> list[dict[str, Any]]:
     imported: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    blacklisted = blacklisted_repositories or set()
 
     for source in whitelist.get("catalogs", []):
         url = source.get("url")
         plugin_ids = source.get("plugins")
         if not isinstance(url, str) or not url.startswith(("https://", "http://")):
             raise CatalogError("whitelist catalog url must be http(s)")
+        if is_blacklisted_repository(github_repository_from_url(url), blacklisted):
+            continue
         if not isinstance(plugin_ids, list) or not all(
             isinstance(item, str) and PLUGIN_ID_RE.fullmatch(item) for item in plugin_ids
         ):
@@ -633,6 +708,7 @@ def release_asset_plugins(
     repositories: list[str],
     catalog_repository: str,
     mirror_root: Path,
+    blacklisted_repositories: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     if not repositories:
         return []
@@ -641,7 +717,10 @@ def release_asset_plugins(
 
     plugins: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
+    blacklisted = blacklisted_repositories or set()
     for full_name in repositories:
+        if is_blacklisted_repository(full_name, blacklisted):
+            continue
         repo = client.repository(full_name)
         if repo.get("archived") or repo.get("disabled"):
             raise CatalogError(f"configured release-asset repository is unavailable: {full_name}")
@@ -848,10 +927,11 @@ def build_entry(
 
 def discover_plugins(
     client: GitHubClient,
-    excluded_repository: str | None = None,
+    excluded_repositories: set[str] | None = None,
     max_repositories: int | None = None,
     included_repositories: list[str] | None = None,
 ) -> list[dict[str, Any]]:
+    blacklisted = excluded_repositories or set()
     discovered: dict[str, dict[str, Any]] = {}
     for query in SEARCH_QUERIES:
         for repo in client.search_repositories(query):
@@ -863,6 +943,8 @@ def discover_plugins(
                 discovered[key] = repo
 
     for full_name in included_repositories or []:
+        if is_blacklisted_repository(full_name, blacklisted):
+            continue
         key = full_name.lower()
         if key not in discovered:
             discovered[key] = client.repository(full_name)
@@ -870,7 +952,7 @@ def discover_plugins(
     plugins: list[dict[str, Any]] = []
     for repo in discovered.values():
         full_name = repo.get("full_name", "")
-        if excluded_repository and full_name.lower() == excluded_repository.lower():
+        if is_blacklisted_repository(full_name, blacklisted):
             continue
         if repo.get("archived") or repo.get("disabled"):
             continue
@@ -992,11 +1074,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--catalog-ref", default=os.environ.get("PLUGINHUB_CATALOG_REF", "main"), help="git ref used by generated raw catalog URLs")
     parser.add_argument("--community-max-bytes", type=int, default=COMMUNITY_CATALOG_MAX_BYTES, help="maximum serialized bytes per Community catalog shard")
     parser.add_argument("--whitelist", default="whitelist.json", help="curated plugin whitelist")
+    parser.add_argument("--blacklist", default="blacklist.json", help="repositories omitted from all generated catalogs")
     parser.add_argument("--policy", default="catalog-policy.json", help="catalog classification policy")
     parser.add_argument(
         "--exclude-repository",
-        default=os.environ.get("GITHUB_REPOSITORY", "jadehawk/PluginHub.crosspoint-plugin"),
-        help="repository to exclude from its own catalog",
+        default=None,
+        help="optional additional owner/repository to exclude for this run",
     )
     parser.add_argument(
         "--catalog-repository",
@@ -1013,10 +1096,16 @@ def main() -> int:
     client = GitHubClient(token)
     try:
         whitelist = load_whitelist(Path(args.whitelist))
-        policy = load_policy(Path(args.policy))
+        blacklist = load_blacklist(Path(args.blacklist))
+        blacklisted_repositories = {repository.lower() for repository in blacklist["repositories"]}
+        if args.exclude_repository:
+            if REPOSITORY_RE.fullmatch(args.exclude_repository) is None:
+                raise CatalogError("exclude-repository must be an owner/repository string")
+            blacklisted_repositories.add(args.exclude_repository.lower())
+        policy = filter_blacklisted_policy(load_policy(Path(args.policy)), blacklisted_repositories)
         release_plugins = discover_plugins(
             client,
-            args.exclude_repository,
+            blacklisted_repositories,
             args.max_repositories,
             whitelist.get("repositories", []),
         )
@@ -1025,14 +1114,21 @@ def main() -> int:
             whitelist.get("release_asset_repositories", []),
             args.catalog_repository,
             Path(RELEASE_ASSET_MIRROR_DIR),
+            blacklisted_repositories,
         )
-        curated_plugins = curated_catalog_plugins(client, whitelist)
+        curated_plugins = curated_catalog_plugins(client, whitelist, blacklisted_repositories)
         official_plugins, community_plugins = split_plugins_by_policy(
             release_plugins,
             curated_plugins,
             asset_plugins,
             policy,
         )
+        official_plugins = [
+            plugin for plugin in official_plugins if not plugin_entry_is_blacklisted(plugin, blacklisted_repositories)
+        ]
+        community_plugins = [
+            plugin for plugin in community_plugins if not plugin_entry_is_blacklisted(plugin, blacklisted_repositories)
+        ]
         plugins = sorted(
             [*official_plugins, *community_plugins],
             key=lambda item: (item["title"].casefold(), item["name"]),

@@ -278,8 +278,10 @@ For these entries:
 
 Classification is intentionally separate from source ingestion. `whitelist.json`
 answers **where a candidate can come from**; `catalog-policy.json` answers **which
-specific plugin IDs and sources are Official**. Repository ownership alone never
-makes a plugin Official.
+specific plugin IDs and sources are Official**; and `blacklist.json` answers **which
+repositories must never be published at all**. Repository ownership alone never
+makes a plugin Official, and the blacklist always wins over whitelist and Official
+policy entries.
 
 If an Official ID is also claimed by another source, the trusted source declared
 in `catalog-policy.json` wins and the conflicting candidate is ignored. If two
@@ -340,6 +342,27 @@ catalog implicitly.
 Any addition or removal under `repositories`, `release_asset_repositories`, or
 `catalogs` changes this repository's `whitelist.json` and therefore requires a
 Plugin Hub pull request. The recommended automatic-discovery path does not.
+
+## Repository blacklist
+
+`blacklist.json` is the repository-level deny list for generated catalogs:
+
+```json
+{
+  "repositories": [
+    "owner/repository"
+  ]
+}
+```
+
+Repository matching is case-insensitive. A blacklisted repository is omitted before
+Official/Community classification, even if it is found automatically, appears in
+`whitelist.json`, is configured as a release-asset repository, backs a curated
+GitHub catalog/base URL, or is named as a trusted Official source in
+`catalog-policy.json`.
+
+Use the blacklist for repositories that Plugin Hub must not publish at all. Keep it
+empty when no repositories need to be suppressed.
 
 ## Immutable sources
 

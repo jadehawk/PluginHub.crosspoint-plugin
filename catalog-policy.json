@@ -21,6 +21,10 @@
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
     },
     {
+      "plugin": "pluginhub",
+      "repository": "jadehawk/PluginHub.crosspoint-plugin"
+    },
+    {
       "plugin": "protected-content",
       "source_catalog": "https://raw.githubusercontent.com/itsthisjustin/sd-plugins/main/catalog.json"
     },

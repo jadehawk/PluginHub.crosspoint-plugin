@@ -642,6 +642,95 @@ class CatalogBuilderTests(unittest.TestCase):
                     Path(temp_dir) / "release-assets",
                 )
 
+    def test_blacklist_loader_deduplicates_repositories_case_insensitively(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "blacklist.json"
+            path.write_text(
+                json.dumps({"repositories": ["Owner/Repo", "owner/repo", "other/plugin"]}),
+                encoding="utf-8",
+            )
+            blacklist = build_catalog.load_blacklist(path)
+
+        self.assertEqual(blacklist["repositories"], ["Owner/Repo", "other/plugin"])
+
+    def test_blacklisted_repository_is_skipped_before_release_lookup(self):
+        class BlacklistedClient:
+            def search_repositories(self, query):
+                return [{"full_name": "owner/blocked", "name": "blocked", "owner": {"login": "owner"}}]
+
+            def latest_stable_release(self, full_name):
+                raise AssertionError("blacklisted repository must not reach release lookup")
+
+        plugins = build_catalog.discover_plugins(BlacklistedClient(), {"owner/blocked"})
+        self.assertEqual(plugins, [])
+
+    def test_blacklisted_release_asset_repository_is_skipped(self):
+        class BlacklistedAssetClient:
+            def repository(self, full_name):
+                raise AssertionError("blacklisted release-asset repository must not be queried")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            plugins = build_catalog.release_asset_plugins(
+                BlacklistedAssetClient(),
+                ["owner/blocked"],
+                "jadehawk/PluginHub.crosspoint-plugin",
+                Path(temp_dir) / "release-assets",
+                {"owner/blocked"},
+            )
+        self.assertEqual(plugins, [])
+
+    def test_blacklist_overrides_official_policy_and_curated_catalog_source(self):
+        policy = {
+            "official": [
+                {"plugin": "blocked", "repository": "owner/blocked"},
+                {
+                    "plugin": "blocked-catalog",
+                    "source_catalog": "https://raw.githubusercontent.com/owner/blocked/main/catalog.json",
+                },
+                {"plugin": "allowed", "repository": "owner/allowed"},
+            ]
+        }
+        filtered = build_catalog.filter_blacklisted_policy(policy, {"owner/blocked"})
+        self.assertEqual(filtered["official"], [{"plugin": "allowed", "repository": "owner/allowed"}])
+
+        class CuratedClient:
+            def fetch_json_url(self, url):
+                raise AssertionError("blacklisted curated catalog must not be fetched")
+
+        whitelist = {
+            "catalogs": [
+                {
+                    "url": "https://raw.githubusercontent.com/owner/blocked/main/catalog.json",
+                    "plugins": ["blocked"],
+                }
+            ]
+        }
+        self.assertEqual(
+            build_catalog.curated_catalog_plugins(CuratedClient(), whitelist, {"owner/blocked"}),
+            [],
+        )
+
+        curated_entry = {
+            "name": "blocked-base",
+            "title": "Blocked Base",
+            "version": "1.0.0",
+            "source_catalog": "https://raw.githubusercontent.com/owner/catalog/main/catalog.json",
+            "base": "https://raw.githubusercontent.com/owner/blocked/main/blocked-base/",
+            "files": ["manifest.json", "plugin.js"],
+        }
+        source_policy = {
+            "official": [
+                {
+                    "plugin": "blocked-base",
+                    "source_catalog": "https://raw.githubusercontent.com/owner/catalog/main/catalog.json",
+                }
+            ]
+        }
+        official, community = build_catalog.split_plugins_by_policy([], [curated_entry], [], source_policy)
+        self.assertEqual(community, [])
+        self.assertEqual(len(official), 1)
+        self.assertTrue(build_catalog.plugin_entry_is_blacklisted(official[0], {"owner/blocked"}))
+
     def test_rate_limit_aborts_catalog_build_instead_of_publishing_partial_results(self):
         class RateLimitedClient:
             def search_repositories(self, query):
