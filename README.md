@@ -29,55 +29,78 @@ firmware requirements, and the 2K/4K/6K torture test, see
 ## Get your plugin into Plugin Hub
 
 > [!IMPORTANT]
-> **If your CrossPoint plugin is at the repository root and follows the automatic-
-> discovery layout below, you do not need to open a Plugin Hub pull request.** Add
-> the `crosspoint-plugin` GitHub topic, publish a stable GitHub Release, and Plugin
-> Hub will discover it automatically.
->
-> We strongly prefer developers to structure new plugins for this automatic path
-> instead of asking for manual allowlisting. This is a project convention rather
-> than a formal CrossPoint requirement, modeled after the predictable standalone
-> plugin layout used by the KOReader plugin ecosystem.
+> **The preferred automatic-discovery layout is one repository per plugin with the
+> installable payload inside a direct child `<plugin-id>.crosspoint-plugin/` folder.**
+> Add the `crosspoint-plugin` GitHub topic, publish a stable GitHub Release, and
+> Plugin Hub will discover it automatically. No Plugin Hub PR is required.
 
-For the concise standalone-repository contract, see [`PLUGIN_REPOSITORY_STANDARD.md`](PLUGIN_REPOSITORY_STANDARD.md).
+For the definitive repository contract, see [`PLUGIN_REPOSITORY_STANDARD.md`](PLUGIN_REPOSITORY_STANDARD.md).
+
+Using an AI coding agent to organize a plugin repository? Give it
+[`PLUGIN_HUB_AGENT_GUIDE.md`](PLUGIN_HUB_AGENT_GUIDE.md).
 
 Choose the path that matches how your plugin is published:
 
 | Plugin layout | Catalog path | Pull request required? |
 | --- | --- | --- |
-| CrossPoint plugin is at the repository root and follows the layout below | **Automatic discovery — RECOMMENDED** | **NO** |
-| CrossPoint plugin is inside a monorepo and published as `*.crosspoint-plugin.zip` Release assets | Release-asset monorepo | **YES** |
+| One plugin repository with `<plugin-id>.crosspoint-plugin/` payload directory | **Automatic discovery — RECOMMENDED** | **NO** |
+| Plugin is published as one or more `*.crosspoint-plugin.zip` Release assets | Release-asset monorepo | **YES** |
 | Plugin must be imported from another catalog | Curated/legacy catalog import | **YES** |
-| Standalone plugin cannot reasonably use automatic discovery and needs an exception | Manual `repositories` entry | **YES — exception only** |
+| Repository cannot reasonably use automatic discovery and needs an exception | Manual `repositories` entry | **YES — exception only** |
 
-### Recommended: standalone plugin repository — NO PR
+### Recommended: one repository per plugin — NO PR
 
-This is the preferred way to publish a new CrossPoint plugin. Think of it as the
-Plugin Hub repository convention: **one plugin, one repository, plugin files at the
-repository root, predictable metadata, and versioned GitHub Releases**. We adopted
-this style from the practical conventions used by the KOReader plugin ecosystem.
+This is the preferred way to publish a new CrossPoint plugin. Repository-root
+development material can coexist cleanly with the plugin because Plugin Hub only
+treats the direct child `<plugin-id>.crosspoint-plugin/` directory as the
+installable payload.
 
-If a new plugin can be structured this way, please do that instead of requesting a
-manual whitelist exception. You do **not** need to open a Plugin Hub pull request,
-edit `whitelist.json`, file an issue, or ask to be manually added.
+A typical repository looks like this:
+
+```text
+my-plugin/
+├── .github/
+├── tests/
+├── tools/
+├── README.md                         # optional repository/development README
+└── my-plugin.crosspoint-plugin/
+    ├── manifest.json
+    ├── device.json                   # at least device.json or plugin.js
+    ├── plugin.js
+    └── README.md                     # travels with the installed plugin
+```
+
+To publish through automatic discovery:
 
 1. Host the plugin in a **public GitHub repository**.
-2. Put the CrossPoint plugin files at the **repository root**.
-3. Add the GitHub repository topic **`crosspoint-plugin`**.
-4. Include a root-level `manifest.json` and at least one runnable entry point:
-   `device.json` or `plugin.js`.
-5. Use a three-part numeric version such as `1.2.0` in `manifest.json`.
-6. Publish a **non-draft, non-prerelease GitHub Release** whose tag matches that
+2. Put the installable payload in exactly one direct child
+   `<plugin-id>.crosspoint-plugin/` directory.
+3. Make the directory stem exactly match `manifest.json -> name`.
+4. Keep `manifest.json`, the plugin README, and at least one runnable entry point
+   (`device.json` or `plugin.js`) inside that payload directory.
+5. Keep development-only files outside the payload directory.
+6. Add the GitHub repository topic **`crosspoint-plugin`**.
+7. Use a three-part numeric version such as `1.2.0` in the payload manifest.
+8. Publish a **non-draft, non-prerelease GitHub Release** whose tag matches that
    manifest version, for example `v1.2.0`.
-7. Wait for the next Plugin Hub catalog refresh. It runs every three hours and can
+9. Wait for the next Plugin Hub catalog refresh. It runs every three hours and can
    also be run manually by a maintainer.
+
+Paths in `manifest.json -> files` are relative to the payload directory. The
+folder name itself is not included in those file paths. Plugin Hub publishes the
+catalog `base` directly at that payload directory.
 
 **That is all. If the plugin follows this convention, no Plugin Hub PR is needed.**
 
+Plugin Hub itself is the intentional root-layout exception because its firmware
+bootstrap and production `stable` branch already depend on repository-root paths.
+New plugins should not copy that exception.
+
 ### Monorepo / release-asset plugin — PR required
 
-Use this when the CrossPoint plugin is not at the repository root and the project
-publishes it as a GitHub Release asset ending in `.crosspoint-plugin.zip`.
+Use this when a project cannot use the preferred direct-child payload convention
+and instead publishes one or more GitHub Release assets ending in
+`.crosspoint-plugin.zip`.
 
 1. Publish one or more `*.crosspoint-plugin.zip` assets on a stable GitHub Release.
 2. Each ZIP must contain exactly one CrossPoint plugin root with `manifest.json`
@@ -138,25 +161,27 @@ declarative bundle installer.
 
 ## Detailed requirements for the recommended no-PR path
 
-The checklist below expands on the standalone automatic-discovery path above.
+The checklist below expands on the automatic-discovery path above.
 
 To make your plugin eligible for Plugin Hub:
 
 1. Host the plugin in a **public GitHub repository**.
 2. Add the GitHub repository topic **`crosspoint-plugin`**.
-3. Keep a root-level `manifest.json` in the repository.
-4. Make sure the release contains `manifest.json` plus at least one runnable
-   CrossPoint entry point: `device.json` or `plugin.js`.
-5. Put every file that must be installed in the optional `files` array in
+3. Create exactly one direct child `<plugin-id>.crosspoint-plugin/` payload directory.
+4. Make the directory stem exactly match the plugin ID.
+5. Keep `manifest.json`, the plugin README, and at least one runnable CrossPoint
+   entry point (`device.json` or `plugin.js`) inside the payload directory.
+6. Put every file that must be installed in the optional `files` array in
    `manifest.json`. If `files` is omitted, Plugin Hub only considers the
-   conventional root files `manifest.json`, `device.json`, `plugin.js`, and
+   conventional payload files `manifest.json`, `device.json`, `plugin.js`, and
    `README.md`.
-6. Set a three-part numeric `MAJOR.MINOR.PATCH` version in `manifest.json`,
+7. Keep development-only files outside the payload directory.
+8. Set a three-part numeric `MAJOR.MINOR.PATCH` version in `manifest.json`,
    for example `1.2.0`.
-7. Publish a **non-draft, non-prerelease GitHub Release** with a matching version
+9. Publish a **non-draft, non-prerelease GitHub Release** with a matching version
    tag, for example `v1.2.0` for manifest version `1.2.0`.
-8. Wait for the next Plugin Hub catalog refresh. The Action runs every three
-   hours, and maintainers can also run it manually.
+10. Wait for the next Plugin Hub catalog refresh. The Action runs every three
+    hours, and maintainers can also run it manually.
 
 Repository names containing `crosspoint-plugin`, such as
 `example.crosspoint-plugin` or `example-crosspoint-plugin`, are also searched
@@ -182,10 +207,10 @@ search for `.xp-plugin` because that name also matches unrelated ecosystems.
 }
 ```
 
-The recommended `name` format is lowercase letters, digits, and hyphens. If
-`name` is missing or unusable, Plugin Hub attempts to derive the plugin ID from
-the repository name by stripping `.xp-plugin`, `.crosspoint-plugin`, or
-`-crosspoint-plugin`.
+The recommended `name` format is lowercase letters, digits, and hyphens. For the
+automatic folder-first path, the payload directory stem must exactly match this
+plugin ID. Repository-name fallback exists only for compatibility and should not
+be relied on by newly published plugins.
 
 For automatically discovered repositories, the preferred display title comes from
 `manifest.json -> title`. If that field is missing or not a string, Plugin Hub
@@ -193,7 +218,8 @@ falls back to the GitHub repository name. For curated catalog imports, a missing
 or empty source title falls back to the plugin ID.
 
 Development files such as tests, GitHub workflows, package metadata, and build
-scripts are not installed unless a plugin explicitly lists them in `files`.
+scripts belong outside the payload directory and are not installable through the
+automatic folder-first path.
 
 ### If your plugin does not appear
 
@@ -205,11 +231,13 @@ Check these items first:
 3. A stable GitHub Release exists. A tag by itself is not enough.
 4. The Release is not marked draft or prerelease.
 5. The Release tag is a supported numeric version.
-6. The root `manifest.json` exists at that exact Release tag.
-7. The manifest version matches the Release tag exactly after removing an optional
-   leading `v`.
-8. The install file list is safe and contains `manifest.json` plus
-   `device.json` or `plugin.js`.
+6. Exactly one root-level `<plugin-id>.crosspoint-plugin/` payload directory exists
+   at that exact Release tag.
+7. That payload contains `manifest.json`, the plugin README, and `device.json` or
+   `plugin.js`.
+8. The payload directory stem matches the plugin ID and the manifest version matches
+   the Release tag exactly after removing an optional leading `v`.
+9. The install file list is safe and relative to the payload directory.
 
 If any of those checks fail, the repository is skipped rather than publishing a
 partially valid catalog entry.
@@ -229,10 +257,11 @@ under `whitelist.json -> repositories`:
 - Supported published versions use exactly three numeric components: `MAJOR.MINOR.PATCH`,
   such as `1.2.3`.
 - The GitHub Release tag may optionally begin with `v`.
-- The root `manifest.json` version at that tag must match the Release version.
+- The payload `<plugin-id>.crosspoint-plugin/manifest.json` version at that tag
+  must match the Release version.
 - Plugin Hub publishes the normalized numeric version without the leading `v`.
-- The generated catalog points to the exact Release tag, never to mutable
-  `main`.
+- The generated catalog points to the exact Release tag and payload directory,
+  never to mutable `main`.
 
 **Every runtime change that should reach installed users must get a new version
 and a new stable GitHub Release.** Do not change plugin files on `main` and
@@ -245,9 +274,9 @@ CrossPoint is expected to remain consistent with the published catalog version.
 
 ### Release-asset monorepos
 
-Some projects ship several targets from one repository instead of keeping the
-CrossPoint plugin at the repository root. **This path requires a pull request to
-Plugin Hub.** The PR adds the GitHub `owner/repository` name, for example
+Some projects ship several targets from one repository and cannot use the preferred
+direct-child payload convention. **This release-asset path requires a pull request
+to Plugin Hub.** The PR adds the GitHub `owner/repository` name, for example
 `readest/readest`, under `whitelist.json -> release_asset_repositories`.
 
 For these repositories, every catalog refresh scans stable GitHub Releases from

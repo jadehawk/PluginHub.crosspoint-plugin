@@ -34,7 +34,7 @@ The recommended path requires no Plugin Hub pull request. The GitHub Action sear
 - GitHub topic `crosspoint-plugin`
 - repository-name compatibility search for `crosspoint-plugin`
 
-A standalone plugin must have a stable, non-draft, non-prerelease GitHub Release, a matching three-part version in `manifest.json`, and installable runtime files.
+An automatically discovered plugin must have exactly one direct child `<plugin-id>.crosspoint-plugin/` payload directory, a stable non-draft/non-prerelease GitHub Release, a matching three-part version in the payload `manifest.json`, and the installable runtime files inside that payload directory. The payload README travels with the plugin. Plugin Hub itself remains the intentional root-layout exception because firmware/bootstrap paths already depend on it.
 
 ### `whitelist.json`
 

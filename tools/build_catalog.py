@@ -35,6 +35,8 @@ SEARCH_QUERIES = (
     'in:name "crosspoint-plugin"',
 )
 CONVENTIONAL_FILES = ("manifest.json", "device.json", "plugin.js", "README.md")
+PLUGIN_DIRECTORY_SUFFIX = ".crosspoint-plugin"
+ROOT_LAYOUT_EXCEPTIONS = {"jadehawk/pluginhub.crosspoint-plugin"}
 VERSION_RE = re.compile(r"^[vV]?(\d+\.\d+\.\d+)$")
 PLUGIN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
@@ -123,6 +125,15 @@ class GitHubClient:
     def latest_stable_release(self, full_name: str) -> dict[str, Any] | None:
         releases = self.stable_releases(full_name, max_pages=1)
         return releases[0] if releases else None
+
+    def directory_contents(self, full_name: str, ref: str, path: str) -> list[dict[str, Any]]:
+        payload = self._request_json(
+            f"/repos/{full_name}/contents/{urllib.parse.quote(path, safe='/')}",
+            {"ref": ref},
+        )
+        if not isinstance(payload, list):
+            raise CatalogError(f"{path} is not a directory for {full_name}@{ref}")
+        return [item for item in payload if isinstance(item, dict)]
 
     def root_contents(self, full_name: str, ref: str) -> list[dict[str, Any]]:
         payload = self._request_json(f"/repos/{full_name}/contents", {"ref": ref})
@@ -877,13 +888,56 @@ def build_entry(
         return None
 
     root = client.root_contents(full_name, tag)
-    root_names = {item.get("name") for item in root if item.get("type") == "file" and isinstance(item.get("name"), str)}
+    plugin_directories = sorted(
+        item["name"]
+        for item in root
+        if item.get("type") == "dir"
+        and isinstance(item.get("name"), str)
+        and item["name"].endswith(PLUGIN_DIRECTORY_SUFFIX)
+    )
+
+    if plugin_directories:
+        if len(plugin_directories) != 1:
+            print(
+                f"skip {full_name}: automatic discovery requires exactly one root-level *{PLUGIN_DIRECTORY_SUFFIX} directory",
+                file=sys.stderr,
+            )
+            return None
+        plugin_root = plugin_directories[0]
+        expected_plugin_id = plugin_root[: -len(PLUGIN_DIRECTORY_SUFFIX)]
+        if PLUGIN_ID_RE.fullmatch(expected_plugin_id) is None:
+            print(f"skip {full_name}: plugin directory {plugin_root!r} has an unsafe plugin id", file=sys.stderr)
+            return None
+        runtime_root = client.directory_contents(full_name, tag, plugin_root)
+        root_names = {
+            item.get("name")
+            for item in runtime_root
+            if item.get("type") == "file" and isinstance(item.get("name"), str)
+        }
+        manifest_path = f"{plugin_root}/manifest.json"
+        base_suffix = f"{urllib.parse.quote(plugin_root, safe='')}/"
+    else:
+        if full_name.lower() not in ROOT_LAYOUT_EXCEPTIONS:
+            print(
+                f"skip {full_name}: release {tag} has no root-level *{PLUGIN_DIRECTORY_SUFFIX} plugin directory",
+                file=sys.stderr,
+            )
+            return None
+        expected_plugin_id = None
+        root_names = {
+            item.get("name")
+            for item in root
+            if item.get("type") == "file" and isinstance(item.get("name"), str)
+        }
+        manifest_path = "manifest.json"
+        base_suffix = ""
+    # root_names now refers to the installable plugin directory (or the Plugin Hub root exception).
     if "manifest.json" not in root_names:
-        print(f"skip {full_name}: release {tag} has no root manifest.json", file=sys.stderr)
+        print(f"skip {full_name}: plugin payload has no manifest.json", file=sys.stderr)
         return None
 
     try:
-        manifest = client.json_file(full_name, tag, "manifest.json")
+        manifest = client.json_file(full_name, tag, manifest_path)
     except CatalogError as exc:
         print(f"skip {full_name}: {exc}", file=sys.stderr)
         return None
@@ -895,6 +949,18 @@ def build_entry(
             file=sys.stderr,
         )
         return None
+
+    if expected_plugin_id is not None:
+        manifest_name = manifest.get("name")
+        if not isinstance(manifest_name, str) or PLUGIN_ID_RE.fullmatch(manifest_name) is None:
+            print(f"skip {full_name}: payload manifest must declare a safe plugin name", file=sys.stderr)
+            return None
+        if manifest_name != expected_plugin_id:
+            print(
+                f"skip {full_name}: plugin directory {plugin_root!r} does not match manifest plugin id {manifest_name!r}",
+                file=sys.stderr,
+            )
+            return None
 
     plugin_id = derive_plugin_id(repo_name, manifest)
     if plugin_id is None:
@@ -920,7 +986,7 @@ def build_entry(
         "release": tag,
         "release_url": release.get("html_url", ""),
         "published_at": release.get("published_at", ""),
-        "base": f"https://raw.githubusercontent.com/{full_name}/{urllib.parse.quote(tag, safe='')}/",
+        "base": f"https://raw.githubusercontent.com/{full_name}/{urllib.parse.quote(tag, safe='')}/{base_suffix}",
         "files": files,
     }
 

@@ -15,12 +15,16 @@ SPEC.loader.exec_module(build_catalog)
 
 
 class FakeClient:
-    def __init__(self, manifest=None, root=None):
+    def __init__(self, manifest=None, root=None, directories=None):
         self.manifest = manifest or {}
         self.root = root or []
+        self.directories = directories or {}
 
     def root_contents(self, full_name, ref):
         return self.root
+
+    def directory_contents(self, full_name, ref, path):
+        return self.directories[path]
 
     def json_file(self, full_name, ref, path):
         return self.manifest
@@ -148,22 +152,25 @@ class CatalogBuilderTests(unittest.TestCase):
                 "version": "0.1.2",
                 "files": ["manifest.json", "device.json", "plugin.js", "README.md"],
             },
-            root=[
-                {"name": "manifest.json", "type": "file"},
-                {"name": "device.json", "type": "file"},
-                {"name": "plugin.js", "type": "file"},
-                {"name": "README.md", "type": "file"},
-            ],
+            root=[{"name": "send2ereader.crosspoint-plugin", "type": "dir"}],
+            directories={
+                "send2ereader.crosspoint-plugin": [
+                    {"name": "manifest.json", "type": "file"},
+                    {"name": "device.json", "type": "file"},
+                    {"name": "plugin.js", "type": "file"},
+                    {"name": "README.md", "type": "file"},
+                ]
+            },
         )
         repo = {
-            "full_name": "jadehawk/send2ereader.xp-plugin",
-            "name": "send2ereader.xp-plugin",
+            "full_name": "jadehawk/send2ereader.crosspoint-plugin",
+            "name": "send2ereader.crosspoint-plugin",
             "description": "fallback",
             "owner": {"login": "jadehawk"},
         }
         release = {
             "tag_name": "v0.1.2",
-            "html_url": "https://github.com/jadehawk/send2ereader.xp-plugin/releases/tag/v0.1.2",
+            "html_url": "https://github.com/jadehawk/send2ereader.crosspoint-plugin/releases/tag/v0.1.2",
             "published_at": "2026-10-01T12:00:00Z",
         }
 
@@ -173,7 +180,7 @@ class CatalogBuilderTests(unittest.TestCase):
         self.assertEqual(entry["version"], "0.1.2")
         self.assertEqual(
             entry["base"],
-            "https://raw.githubusercontent.com/jadehawk/send2ereader.xp-plugin/v0.1.2/",
+            "https://raw.githubusercontent.com/jadehawk/send2ereader.crosspoint-plugin/v0.1.2/send2ereader.crosspoint-plugin/",
         )
         self.assertEqual(entry["files"], client.manifest["files"])
 
@@ -184,19 +191,75 @@ class CatalogBuilderTests(unittest.TestCase):
                 "version": "0.1.1",
                 "files": ["manifest.json", "device.json"],
             },
-            root=[
-                {"name": "manifest.json", "type": "file"},
-                {"name": "device.json", "type": "file"},
-            ],
+            root=[{"name": "example.crosspoint-plugin", "type": "dir"}],
+            directories={
+                "example.crosspoint-plugin": [
+                    {"name": "manifest.json", "type": "file"},
+                    {"name": "device.json", "type": "file"},
+                ]
+            },
         )
         repo = {
-            "full_name": "owner/example.xp-plugin",
-            "name": "example.xp-plugin",
+            "full_name": "owner/example.crosspoint-plugin",
+            "name": "example.crosspoint-plugin",
             "owner": {"login": "owner"},
         }
         release = {"tag_name": "v0.1.2"}
 
         self.assertIsNone(build_catalog.build_entry(client, repo, release))
+
+    def test_build_entry_rejects_root_layout_for_normal_plugins(self):
+        client = FakeClient(
+            manifest={"name": "example", "version": "0.1.2", "files": ["manifest.json", "device.json"]},
+            root=[
+                {"name": "manifest.json", "type": "file"},
+                {"name": "device.json", "type": "file"},
+            ],
+        )
+        repo = {"full_name": "owner/example.crosspoint-plugin", "name": "example.crosspoint-plugin", "owner": {"login": "owner"}}
+        self.assertIsNone(build_catalog.build_entry(client, repo, {"tag_name": "v0.1.2"}))
+
+    def test_build_entry_keeps_plugin_hub_root_layout_exception(self):
+        client = FakeClient(
+            manifest={"name": "pluginhub", "version": "0.1.6", "files": ["manifest.json", "device.json", "plugin.js", "README.md"]},
+            root=[
+                {"name": "manifest.json", "type": "file"},
+                {"name": "device.json", "type": "file"},
+                {"name": "plugin.js", "type": "file"},
+                {"name": "README.md", "type": "file"},
+            ],
+        )
+        repo = {"full_name": "jadehawk/PluginHub.crosspoint-plugin", "name": "PluginHub.crosspoint-plugin", "owner": {"login": "jadehawk"}}
+        entry = build_catalog.build_entry(client, repo, {"tag_name": "v0.1.6"})
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["base"], "https://raw.githubusercontent.com/jadehawk/PluginHub.crosspoint-plugin/v0.1.6/")
+
+    def test_build_entry_rejects_folder_manifest_id_mismatch(self):
+        client = FakeClient(
+            manifest={"name": "different", "version": "0.1.2", "files": ["manifest.json", "device.json"]},
+            root=[{"name": "example.crosspoint-plugin", "type": "dir"}],
+            directories={"example.crosspoint-plugin": [{"name": "manifest.json", "type": "file"}, {"name": "device.json", "type": "file"}]},
+        )
+        repo = {"full_name": "owner/example.crosspoint-plugin", "name": "example.crosspoint-plugin", "owner": {"login": "owner"}}
+        self.assertIsNone(build_catalog.build_entry(client, repo, {"tag_name": "v0.1.2"}))
+
+    def test_build_entry_requires_manifest_name_for_folder_layout(self):
+        client = FakeClient(
+            manifest={"version": "0.1.2", "files": ["manifest.json", "device.json"]},
+            root=[{"name": "example.crosspoint-plugin", "type": "dir"}],
+            directories={
+                "example.crosspoint-plugin": [
+                    {"name": "manifest.json", "type": "file"},
+                    {"name": "device.json", "type": "file"},
+                ]
+            },
+        )
+        repo = {
+            "full_name": "owner/example.crosspoint-plugin",
+            "name": "example.crosspoint-plugin",
+            "owner": {"login": "owner"},
+        }
+        self.assertIsNone(build_catalog.build_entry(client, repo, {"tag_name": "v0.1.2"}))
 
     def test_discovery_does_not_globally_search_xp_plugin_names(self):
         self.assertIn("topic:crosspoint-plugin", build_catalog.SEARCH_QUERIES)
@@ -417,6 +480,9 @@ class CatalogBuilderTests(unittest.TestCase):
                 return {"tag_name": "v1.0.0"}
 
             def root_contents(self, full_name, ref):
+                return [{"name": "duplicate-id.crosspoint-plugin", "type": "dir"}]
+
+            def directory_contents(self, full_name, ref, path):
                 return [
                     {"name": "manifest.json", "type": "file"},
                     {"name": "plugin.js", "type": "file"},
