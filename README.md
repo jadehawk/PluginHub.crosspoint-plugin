@@ -44,7 +44,7 @@ Choose the path that matches how your plugin is published:
 | Plugin layout | Catalog path | Pull request required? |
 | --- | --- | --- |
 | One plugin repository with `<plugin-id>.crosspoint-plugin/` payload directory | **Automatic discovery — RECOMMENDED** | **NO** |
-| Plugin is published as one or more `*.crosspoint-plugin.zip` Release assets | Release-asset monorepo | **YES** |
+| Plugin is published as one or more `*.crosspoint-plugin.zip` Release assets | **Secondary exception — release-asset monorepo** | **YES** |
 | Plugin must be imported from another catalog | Curated/legacy catalog import | **YES** |
 | Repository cannot reasonably use automatic discovery and needs an exception | Manual `repositories` entry | **YES — exception only** |
 
@@ -98,7 +98,19 @@ New plugins should not copy that exception.
 
 ### Monorepo / release-asset plugin — PR required
 
-Use this when a project cannot use the preferred direct-child payload convention
+> [!IMPORTANT]
+> This is a **secondary exception path**, not an equally preferred alternative to
+> the one-plugin-per-repository standard. Keeping several CrossPoint plugins in one
+> repository for convenience is not, by itself, a reason for Plugin Hub maintainers
+> to add special configuration. Plugin authors are expected to isolate each plugin
+> into its own standards-compliant repository whenever that is reasonably possible.
+>
+> Use this path only when the upstream project has a genuine monorepo constraint
+> that makes separate plugin repositories impractical. Because this path adds a
+> persistent source to Plugin Hub's configuration, it requires maintainer review and
+> approval through a Plugin Hub pull request.
+
+Use this when a project cannot reasonably use the preferred direct-child payload convention
 and instead publishes one or more GitHub Release assets ending in
 `.crosspoint-plugin.zip`.
 

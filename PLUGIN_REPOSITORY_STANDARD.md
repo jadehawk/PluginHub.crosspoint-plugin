@@ -16,6 +16,8 @@ This keeps development files, tests, screenshots, build tooling, CI configuratio
 
 A normal standards-compliant plugin does **not** need a Plugin Hub pull request. Add the `crosspoint-plugin` GitHub topic and publish a stable GitHub Release; Plugin Hub's scheduled discovery will evaluate it automatically.
 
+This is the normal self-service ingress path and should be used whenever reasonably possible. Plugin Hub should not require maintainer-side exceptions simply to accommodate a developer's preferred repository organization. If several CrossPoint plugins can be isolated into separate repositories, authors are expected to do that rather than request monorepo configuration in Plugin Hub.
+
 A newly discovered plugin is published in **Community Plugins** unless maintainers explicitly classify that plugin ID and trusted source as Official in `catalog-policy.json`. Repository ownership does not determine Official status.
 
 ## Required repository shape
@@ -126,9 +128,11 @@ This exception is specific to Plugin Hub and should not be copied by new plugins
 
 ## When a Plugin Hub pull request is required
 
-A pull request is required only for publishing paths that need explicit configuration, including:
+A pull request is required only for publishing paths that need explicit configuration. These are secondary or exceptional ingress paths, not alternatives that plugin authors should choose merely to avoid isolating a plugin into its own repository.
 
-- a monorepo that publishes one or more `*.crosspoint-plugin.zip` Release assets;
+They include:
+
+- a genuine monorepo that cannot reasonably isolate its CrossPoint plugin or plugins and therefore publishes one or more `*.crosspoint-plugin.zip` Release assets;
 - a plugin that must temporarily be imported from another catalog;
 - an exceptional repository that cannot use automatic discovery;
 - a maintainer-approved change to Official catalog policy.

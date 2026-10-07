@@ -13,6 +13,8 @@ Plugin Hub's preferred standard is:
 - development files remain outside that payload directory;
 - the payload directory contains every file that must travel with and be installed with the plugin.
 
+Treat this as the default publishing architecture, not merely one option among equals. If a source repository contains several CrossPoint plugins, prefer isolating each plugin into its own standards-compliant repository. Do not recommend Plugin Hub's release-asset monorepo exception merely because the developer currently keeps several plugins together; that path exists for genuine upstream monorepo constraints and requires maintainer approval.
+
 ## Required result
 
 For a plugin whose ID is `example-plugin`, produce this shape:
